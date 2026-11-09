@@ -12,11 +12,13 @@
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #e3e6eb;
     --accent: #1f6feb; --home: #1a7f4b; --noted: #7b3fe4; --row-hover: #eef4ff;
+    --noted-bg: #f4effe; --noted-line: #cdb8f6; --noted-ink: #5a2bb3; --warn: #8a4b00; --warn-bg: #fff3dc; --warn-line: #f0c77a;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #12151b; --panel: #1a1e26; --text: #e6e9ef; --muted: #9aa3b2; --line: #2a303b;
       --accent: #5b9bff; --home: #3fbf7f; --noted: #a67bff; --row-hover: #222a38; color-scheme: dark;
+      --noted-bg: #221a35; --noted-line: #4b3a78; --noted-ink: #c9b0ff; --warn: #f3bd66; --warn-bg: #2f2410; --warn-line: #6b5120;
     }
   }
   * { box-sizing: border-box; }
@@ -63,22 +65,39 @@
   .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid #fff;
          box-shadow: 0 0 0 1px var(--line); vertical-align: -1px; }
   .dot.home { background: #1a7f4b; } .dot.noted { background: #7b3fe4; }
-  .notes-box { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-top: 14px; background: var(--bg); }
-  .notes-box h2 { font-size: 14px; margin: 0 0 4px; }
-  .notes-box .legend { color: var(--muted); font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
-  .notes-box .btns { display: flex; gap: 6px; flex-wrap: wrap; }
-  .notes-box .msg { font-size: 12px; margin-top: 6px; min-height: 1em; color: var(--muted); }
+  /* ---- My notes card in the side panel */
+  .notes-box { border: 1.5px solid var(--noted-line); border-radius: 10px; padding: 12px; margin-top: 14px;
+               background: var(--noted-bg); display: grid; gap: 9px; }
+  .nb-head { display: flex; align-items: center; gap: 8px; }
+  .nb-icon { width: 28px; height: 28px; border-radius: 50%; background: var(--noted); color: #fff;
+             display: grid; place-items: center; flex: none; }
+  .notes-box h2 { font-size: 15px; margin: 0; color: var(--noted-ink); flex: 1; }
+  .nb-count { font-size: 12px; font-weight: 700; color: #fff; background: var(--noted); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+  .notes-box .legend { color: var(--muted); font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .backup-status { font-size: 12px; display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px;
+                   background: var(--panel); border: 1px solid var(--noted-line); color: var(--text); }
+  .backup-status.warn { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn); font-weight: 600; }
+  .notes-box .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .notes-box .btns button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; padding: 9px 10px; }
+  .btn-noted { background: var(--noted); border-color: var(--noted); color: #fff; }
+  .btn-noted-outline { background: var(--panel); border: 1.5px solid var(--noted); color: var(--noted-ink); }
+  .notes-box .msg { font-size: 12px; color: var(--muted); }
   .msg.err { color: #c62828; }
-  .popup .notes { margin-top: 8px; border-top: 1px solid #ddd; padding-top: 6px; }
-  .popup .notes label { font-weight: 600; font-size: 12px; display: block; margin-bottom: 3px; }
-  .popup textarea { width: 100%; min-height: 64px; resize: vertical; font: inherit; font-size: 13px; padding: 6px;
-                    border: 1px solid #c9cdd4; border-radius: 6px; background: #fff; color: #1d2330; }
-  .popup .note-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; font-size: 12px; color: #667085; }
-  .popup .note-row button { padding: 3px 8px; font-size: 12px; background: #fff; color: #1d2330; border-color: #c9cdd4; }
+  /* ---- notes panel inside a home's popup (popups are always light) */
+  .popup .notes { margin-top: 10px; padding: 10px; border-radius: 10px; background: #f4effe; border: 1.5px solid #cdb8f6; }
+  .popup .notes-title { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; color: #5a2bb3; margin-bottom: 6px; }
+  .popup .notes-title .nb-icon { width: 22px; height: 22px; background: #7b3fe4; }
+  .popup .notes label.sub-label, .popup .vlabel { font-weight: 600; font-size: 12px; color: #3d2a66; }
+  .popup .notes label.sub-label { display: block; margin-bottom: 3px; }
+  .popup textarea { width: 100%; min-height: 64px; resize: vertical; font: inherit; font-size: 13px; padding: 7px;
+                    border: 1.5px solid #cdb8f6; border-radius: 6px; background: #fff; color: #1d2330; }
+  .popup textarea:focus { outline: none; border-color: #7b3fe4; box-shadow: 0 0 0 3px rgba(123,63,228,.18); }
+  .popup .note-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; font-size: 12px; color: #5f5678; }
+  .popup .note-row button { padding: 3px 8px; font-size: 12px; background: #fff; color: #1d2330; border-color: #cdb8f6; }
   .pill.noted { background: #7b3fe4; }
   /* tall popups scroll inside themselves instead of running off the screen */
   .leaflet-popup-content { max-height: calc(100vh - 140px); overflow-y: auto; overscroll-behavior: contain; }
-  .popup .voice { margin-top: 8px; }
+  .popup .voice { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #cdb8f6; }
   .popup .voice-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .popup .vlabel { font-weight: 600; font-size: 12px; }
   .popup .rec-btn { padding: 4px 10px; font-size: 12px; background: #fff; color: #c62828; border-color: #e3a5a5; font-weight: 600; }
@@ -89,7 +108,26 @@
   .popup .clip { margin-top: 6px; }
   .popup .clip audio { width: 100%; height: 36px; display: block; }
   .popup .clip-meta { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 11px; color: #667085; }
-  .popup .clip-del { padding: 2px 8px; font-size: 11px; background: #fff; color: #1d2330; border-color: #c9cdd4; }
+  .popup .clip-del { padding: 2px 8px; font-size: 11px; background: #fff; color: #1d2330; border-color: #cdb8f6; }
+  .popup .clip-meta { color: #5f5678; }
+  .popup .photos { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #cdb8f6; }
+  .popup .photo-btn { padding: 4px 10px; font-size: 12px; background: #fff; color: #5a2bb3; border-color: #cdb8f6; font-weight: 600; }
+  .popup .photo-msg { font-size: 12px; color: #667085; margin-top: 2px; }
+  .popup .photo-msg.err { color: #c62828; }
+  .popup .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; margin-top: 6px; }
+  .popup .thumb { padding: 0; border: 1.5px solid #cdb8f6; border-radius: 6px; overflow: hidden; aspect-ratio: 1; background: #fff; cursor: zoom-in; }
+  .popup .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* full-size photo viewer */
+  #viewer { position: fixed; inset: 0; z-index: 3000; background: rgba(10, 8, 20, .92); display: flex; flex-direction: column;
+            padding: calc(10px + env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+  #viewer[hidden] { display: none; }
+  #viewer .vimg { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  #viewer img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; }
+  #viewer .vbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; color: #e9e4f7; font-size: 13px; }
+  #viewer .vbar span { flex: 1; min-width: 0; }
+  #viewer button { padding: 10px 14px; font-weight: 600; }
+  #viewerDelete { background: #fff; color: #c62828; border-color: #fff; }
+  #viewerClose { background: #7b3fe4; color: #fff; border-color: #7b3fe4; }
   @media (prefers-reduced-motion: no-preference) { .popup .rec-btn.recording { animation: recpulse 1.2s ease-in-out infinite; } }
   @keyframes recpulse { 50% { opacity: .65; } }
   #mbar, .mobile-only { display: none; }
@@ -130,7 +168,7 @@
     .c-baths, .c-lastSaleDate, .c-lastSaleAmt { display: none; }
     .leaflet-popup-content { margin: 10px 12px; max-height: calc(100vh - 200px); max-height: calc(100dvh - 200px); }
     .popup textarea { font-size: 16px; } /* stops iOS zoom-on-focus */
-    .popup .note-row button, .popup .rec-btn, .popup .clip-del { padding: 8px 12px; font-size: 13px; }
+    .popup .note-row button, .popup .rec-btn, .popup .clip-del, .popup .photo-btn { padding: 8px 12px; font-size: 13px; }
     .popup .voice-list { max-height: 140px; }
     .locate-btn { width: 44px; height: 44px; }
     .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 40px; }
@@ -145,14 +183,21 @@
   <p class="about">Every home shown has a homestead exemption, which means the owner lives there as their permanent residence.</p>
 
   <section class="notes-box" aria-labelledby="notesTitle">
-    <h2 id="notesTitle">My notes · <span id="noteCount">0</span></h2>
+    <div class="nb-head">
+      <span class="nb-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 3h10l4 4v14H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 11h8M8 15h8M8 7h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+      <h2 id="notesTitle">My notes</h2>
+      <span class="nb-count" id="noteCount">0 homes</span>
+    </div>
     <div class="legend"><span><span class="dot home"></span> Owner-occupied home</span><span><span class="dot noted"></span> Has my notes</span></div>
+    <div class="backup-status" id="backupStatus" role="status">Nothing to back up yet.</div>
     <div class="btns">
-      <button id="backupNotes" type="button">Back up notes</button>
-      <button id="restoreNotes" type="button">Restore notes</button>
+      <button id="backupNotes" type="button" class="btn-noted">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Back up</button>
+      <button id="restoreNotes" type="button" class="btn-noted-outline">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Restore</button>
       <input type="file" id="restoreFile" accept=".json,application/json" hidden>
     </div>
-    <div class="msg" id="notesMsg">Text and voice notes are saved in this browser on this device only. Back them up to keep them safe or move them to another device.</div>
+    <div class="msg" id="notesMsg">Text, voice and photo notes are saved on this device only. Back up to keep them safe or to move them to another device.</div>
   </section>
 
   <label class="f" for="q">Owner, address or parcel</label>
@@ -222,6 +267,11 @@
   </section>
 </main>
 
+<div id="viewer" role="dialog" aria-modal="true" aria-label="Photo" hidden>
+  <div class="vimg"><img id="viewerImg" alt="Photo note"></div>
+  <div class="vbar"><span id="viewerWhen"></span><button type="button" id="viewerDelete">Delete photo</button><button type="button" id="viewerClose">Close</button></div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
@@ -254,59 +304,93 @@ function persistNotes() {
   catch (e) { notesMsg('This browser is not letting the site save notes (private browsing or storage turned off).', true); return false; }
 }
 // a home "has notes" if it has a text note or at least one voice note
-const hasNote = p => !!(notes[p] && notes[p].text) || (voiceCounts.get(p) || 0) > 0;
+const hasNote = p => !!(notes[p] && notes[p].text) || (voiceCounts.get(p) || 0) > 0 || (photoCounts.get(p) || 0) > 0;
 function notesMsg(text, err) { const m = $('#notesMsg'); m.textContent = text; m.classList.toggle('err', !!err); }
 function updateNoteCount() {
   const homes = new Set(Object.keys(notes));
   voiceCounts.forEach((n, p) => { if (n > 0) homes.add(p); });
+  photoCounts.forEach((n, p) => { if (n > 0) homes.add(p); });
   $('#noteCount').textContent = homes.size.toLocaleString() + (homes.size === 1 ? ' home' : ' homes');
+  renderBackupStatus(homes.size);
 }
 
-// ---------- voice notes: audio clips kept in this browser's database (IndexedDB)
+// ---------- backup reminder: when was the last backup, and has anything changed since?
+const stamp = { get: k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
+                set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+const markNotesChanged = () => { stamp.set('homeowners.lastChange', new Date().toISOString()); updateNoteCount(); };
+function ago(iso) {
+  const days = Math.floor((Date.now() - new Date(iso)) / 86400000);
+  return days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
+}
+function renderBackupStatus(homeCount) {
+  const el = $('#backupStatus'); if (!el) return;
+  const last = stamp.get('homeowners.lastBackup'), changed = stamp.get('homeowners.lastChange');
+  let text, warn = false;
+  if (!homeCount) text = 'Nothing to back up yet.';
+  else if (!last) { text = '⚠ Not backed up yet. Tap Back up to save a copy.'; warn = true; }
+  else if (changed && changed > last) { text = `⚠ New changes since your last backup (${ago(last)}).`; warn = true; }
+  else if (Date.now() - new Date(last) > 14 * 86400000) { text = `⚠ Last backup was ${ago(last)}.`; warn = true; }
+  else text = `✓ Backed up ${ago(last)}.`;
+  el.textContent = text;
+  el.classList.toggle('warn', warn);
+}
+
+// ---------- voice and photo notes: kept in this browser's database (IndexedDB)
+// store 'voice' = audio clips, store 'photos' = pictures; each record has a parcel and a blob
 const voiceCounts = new Map();   // parcel -> number of clips
-let voiceDbP = null;
-function voiceDb() {
-  if (!voiceDbP) voiceDbP = new Promise((res, rej) => {
-    const req = indexedDB.open('homeowners', 1);
-    req.onupgradeneeded = () => req.result.createObjectStore('voice', { keyPath: 'id', autoIncrement: true }).createIndex('parcel', 'parcel');
+const photoCounts = new Map();   // parcel -> number of photos
+const COUNTS = { voice: voiceCounts, photos: photoCounts };
+let mediaDbP = null;
+function mediaDb() {
+  if (!mediaDbP) mediaDbP = new Promise((res, rej) => {
+    const req = indexedDB.open('homeowners', 2);
+    req.onupgradeneeded = () => {          // v1 had only 'voice'; v2 adds 'photos' and keeps existing clips
+      const db = req.result;
+      for (const name of ['voice', 'photos'])
+        if (!db.objectStoreNames.contains(name))
+          db.createObjectStore(name, { keyPath: 'id', autoIncrement: true }).createIndex('parcel', 'parcel');
+    };
     req.onsuccess = () => res(req.result);
     req.onerror = () => rej(req.error);
   });
-  return voiceDbP;
+  return mediaDbP;
 }
-async function vstore(mode, fn) {
-  const db = await voiceDb();
+async function vstore(mode, fn, name = 'voice') {
+  const db = await mediaDb();
   return new Promise((res, rej) => {
-    const t = db.transaction('voice', mode), s = t.objectStore('voice');
+    const t = db.transaction(name, mode), s = t.objectStore(name);
     let out; const req = fn(s);
     if (req) req.onsuccess = () => { out = req.result; };
     t.oncomplete = () => res(out);
     t.onerror = t.onabort = () => rej(t.error);
   });
 }
-async function loadVoiceCounts() {           // counts clips per home without loading any audio
-  const db = await voiceDb();
+async function loadCounts(name) {           // counts items per home without loading any audio or images
+  const db = await mediaDb(), counts = COUNTS[name];
   return new Promise(res => {
-    const req = db.transaction('voice').objectStore('voice').index('parcel').openKeyCursor();
+    const req = db.transaction(name).objectStore(name).index('parcel').openKeyCursor();
     req.onsuccess = () => {
       const c = req.result;
       if (!c) return res();
-      voiceCounts.set(c.key, (voiceCounts.get(c.key) || 0) + 1);
+      counts.set(c.key, (counts.get(c.key) || 0) + 1);
       c.continue();
     };
     req.onerror = () => res();
   });
 }
-const voiceList = p => vstore('readonly', s => s.index('parcel').getAll(p));
-async function voiceAdd(rec) {
-  await vstore('readwrite', s => s.add(rec));
-  voiceCounts.set(rec.parcel, (voiceCounts.get(rec.parcel) || 0) + 1);
+const mediaList = (name, p) => vstore('readonly', s => s.index('parcel').getAll(p), name);
+async function mediaAdd(name, rec) {
+  await vstore('readwrite', s => s.add(rec), name);
+  COUNTS[name].set(rec.parcel, (COUNTS[name].get(rec.parcel) || 0) + 1);
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});   // ask the browser not to auto-clear
 }
-async function voiceDelete(id, p) {
-  await vstore('readwrite', s => s.delete(id));
-  voiceCounts.set(p, Math.max(0, (voiceCounts.get(p) || 0) - 1));
+async function mediaDelete(name, id, p) {
+  await vstore('readwrite', s => s.delete(id), name);
+  COUNTS[name].set(p, Math.max(0, (COUNTS[name].get(p) || 0) - 1));
 }
+const voiceList = p => mediaList('voice', p);
+const voiceAdd = rec => mediaAdd('voice', rec);
+const voiceDelete = (id, p) => mediaDelete('voice', id, p);
 const fmtDur = ms => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const DOT = { home: '#1a7f4b', noted: '#7b3fe4' };
 const dotStyle = p => ({ radius: 9, color: '#fff', weight: 2, fillColor: hasNote(p) ? DOT.noted : DOT.home, fillOpacity: 0.95 });
@@ -373,13 +457,20 @@ function popupHtml(i) {
       <tr><th>Value</th><td>${fmt$(r[VALUE])} market value</td></tr>
     </table>
     <div class="notes">
-      <label for="note-${i}">My notes</label>
+      <div class="notes-title"><span class="nb-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="13" height="13"><path d="M5 3h10l4 4v14H5z" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M8 11h8M8 15h8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></span>My notes</div>
+      <label class="sub-label" for="note-${i}">Text note</label>
       <textarea id="note-${i}" data-i="${i}" placeholder="Type a note about this home. It saves automatically.">${esc(n ? n.text : '')}</textarea>
       <div class="note-row"><button type="button" class="note-del" data-i="${i}"${n ? '' : ' hidden'}>Delete note</button><span class="note-status">${esc(savedWhen(r[P]))}</span></div>
       <div class="voice" data-i="${i}">
         <div class="voice-head"><span class="vlabel">Voice notes</span><button type="button" class="rec-btn" data-i="${i}">● Record</button></div>
         <div class="voice-msg" role="status"></div>
         <div class="voice-list"></div>
+      </div>
+      <div class="photos" data-i="${i}">
+        <div class="voice-head"><span class="vlabel">Photos</span><button type="button" class="photo-btn" data-i="${i}">📷 Add photo</button></div>
+        <input type="file" class="photo-input" data-i="${i}" accept="image/*" multiple hidden>
+        <div class="photo-msg" role="status"></div>
+        <div class="photo-grid"></div>
       </div>
     </div>
     <div class="sales">Loading sales…</div>
@@ -391,11 +482,19 @@ async function openHome(i, marker) {
   const opts = { maxWidth: popupW(), autoPanPaddingTopLeft: [10, isMobile() ? 70 : 10] };
   const popup = L.popup(opts).setContent(popupHtml(i));
   popup.audioUrls = [];
-  popup.on('remove', () => { popup.audioUrls.forEach(u => URL.revokeObjectURL(u)); popup.audioUrls = []; });
+  popup.photoUrls = [];
+  popup.on('remove', () => {
+    [...popup.audioUrls, ...popup.photoUrls].forEach(u => URL.revokeObjectURL(u));
+    popup.audioUrls = []; popup.photoUrls = [];
+  });
   currentPopup = popup;
   if (marker) marker.unbindPopup().bindPopup(popup).openPopup();
   else popup.setLatLng([r[LAT], r[LON]]).openOn(map);
+  // fit the popup inside the visible map (it scrolls inside itself if longer)
+  const content = popup.getElement()?.querySelector('.leaflet-popup-content');
+  if (content) content.style.maxHeight = Math.max(200, map.getSize().y - (isMobile() ? 130 : 60)) + 'px';
   renderVoice(i);
+  renderPhotos(i);
   const sales = await salesFor(r[P]);
   // fill in only the sales part, so a note being typed is not wiped out
   const el = popup.getElement()?.querySelector('.sales');
@@ -413,14 +512,14 @@ function saveNote(i, text) {
   if (text) notes[p] = { text, updated: new Date().toISOString() };
   else delete notes[p];
   persistNotes();
-  updateNoteCount();
+  markNotesChanged();
   if (markers[i]) markers[i].setStyle(dotStyle(p));
   if (had !== hasNote(p) && $('#hasNotes').checked) debounced();
   return !!notes[p];
 }
 function homeNotesChanged(i, had) {   // after a voice clip is added or removed
   const p = rows[i][P];
-  updateNoteCount();
+  markNotesChanged();
   if (markers[i]) markers[i].setStyle(dotStyle(p));
   if (had !== hasNote(p) && $('#hasNotes').checked) debounced();
 }
@@ -528,6 +627,107 @@ document.addEventListener('click', async e => {
     renderVoice(i);
   }
 });
+// ---------- photo notes: take or choose pictures, shrunk to save space, kept on this device
+const photoBox = i => document.querySelector(`.popup .photos[data-i="${i}"]`);
+function photoMsg(i, text, err) {
+  const m = photoBox(i)?.querySelector('.photo-msg'); if (!m) return;
+  m.textContent = text; m.classList.toggle('err', !!err);
+}
+// phone photos are often 3-8 MB; resize to at most 1600 px and save as JPEG (~200-500 KB)
+async function shrinkImage(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    // onload, not img.decode(): decode() can stall in some browsers when the page isn't being painted
+    const img = new Image();
+    await new Promise((ok, fail) => {
+      const t = setTimeout(() => fail(new Error('image load timed out')), 15000);
+      img.onload = () => { clearTimeout(t); ok(); };
+      img.onerror = () => { clearTimeout(t); fail(new Error('unreadable image')); };
+      img.src = url;
+    });
+    const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+    const c = Object.assign(document.createElement('canvas'), { width: w, height: h });
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.82));
+    return blob && blob.size < file.size ? blob : file;
+  } catch (e) {
+    return file;   // a format the browser can't draw (it can still be stored as-is)
+  } finally { URL.revokeObjectURL(url); }
+}
+async function renderPhotos(i) {
+  const box = photoBox(i); if (!box || !currentPopup) return;
+  const popup = currentPopup;
+  let pics = [];
+  try { pics = await mediaList('photos', rows[i][P]); }
+  catch (e) { photoMsg(i, 'This browser is not letting the site save photos (private browsing or storage turned off).', true); return; }
+  const grid = photoBox(i)?.querySelector('.photo-grid'); if (!grid) return;
+  (popup.photoUrls || []).forEach(u => URL.revokeObjectURL(u)); popup.photoUrls = [];
+  pics.sort((a, b) => b.created.localeCompare(a.created));
+  grid.innerHTML = pics.map(ph => {
+    const url = URL.createObjectURL(ph.blob); popup.photoUrls.push(url);
+    return `<button type="button" class="thumb" data-id="${ph.id}" data-i="${i}" data-url="${url}" data-when="${esc(ph.created)}"
+      aria-label="View photo from ${esc(new Date(ph.created).toLocaleString())}"><img src="${url}" alt=""></button>`;
+  }).join('');
+  refit(popup);
+}
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.popup .photo-btn');
+  if (btn) { photoBox(Number(btn.dataset.i))?.querySelector('.photo-input').click(); return; }
+  const th = e.target.closest('.popup .thumb');
+  if (th) openViewer(Number(th.dataset.i), Number(th.dataset.id), th.dataset.url, th.dataset.when);
+});
+document.addEventListener('change', async e => {
+  const input = e.target.closest('.popup .photo-input'); if (!input) return;
+  const i = Number(input.dataset.i), files = [...input.files]; input.value = '';
+  if (!files.length) return;
+  const p = rows[i][P], had = hasNote(p);
+  photoMsg(i, files.length > 1 ? `Saving ${files.length} photos…` : 'Saving photo…');
+  let saved = 0;
+  for (const f of files) {
+    if (!f.type.startsWith('image/') && !/\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name)) continue;
+    try {
+      const blob = await shrinkImage(f);
+      await mediaAdd('photos', { parcel: p, created: new Date(Date.now() + saved).toISOString(), type: blob.type || f.type, blob });
+      saved++;
+    } catch (err) { photoMsg(i, 'Could not save the photo: ' + (err?.message || err), true); }
+  }
+  if (saved) {
+    homeNotesChanged(i, had);
+    photoMsg(i, saved === 1 ? 'Photo saved.' : `${saved} photos saved.`);
+    renderPhotos(i);
+  }
+});
+
+// full-size photo viewer
+let viewing = null;   // { i, id }
+function openViewer(i, id, url, when) {
+  viewing = { i, id };
+  $('#viewerImg').src = url;
+  $('#viewerWhen').textContent = `${addressOf(rows[i])} · ${new Date(when).toLocaleString()}`;
+  const del = $('#viewerDelete'); delete del.dataset.armed; del.textContent = 'Delete photo';
+  $('#viewer').hidden = false;
+  $('#viewerClose').focus();
+}
+function closeViewer() { $('#viewer').hidden = true; $('#viewerImg').removeAttribute('src'); viewing = null; }
+$('#viewerClose').addEventListener('click', closeViewer);
+$('#viewer').addEventListener('click', e => { if (e.target.id === 'viewer') closeViewer(); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && viewing) closeViewer(); });
+$('#viewerDelete').addEventListener('click', async () => {
+  const del = $('#viewerDelete');
+  if (!del.dataset.armed) {           // first tap arms, second tap deletes
+    del.dataset.armed = '1'; del.textContent = 'Tap again to delete';
+    setTimeout(() => { if (del.dataset.armed) { delete del.dataset.armed; del.textContent = 'Delete photo'; } }, 3000);
+    return;
+  }
+  const { i, id } = viewing, p = rows[i][P], had = hasNote(p);
+  await mediaDelete('photos', id, p);
+  closeViewer();
+  homeNotesChanged(i, had);
+  photoMsg(i, 'Photo deleted.');
+  renderPhotos(i);
+});
+
 // closing the popup stops (and saves) a recording in progress
 map.on('popupclose', () => { if (rec) stopRec(); });
 const noteTimers = {};
@@ -707,14 +907,14 @@ $('#reset').addEventListener('click', () => {
 $('#export').addEventListener('click', () => {
   const head = ['Parcel', 'Owner', 'Street', 'City', 'ZIP', 'Tax bill mailed to', 'Property type', 'Subdivision',
                 'Year built', 'Living sq ft', 'Bedrooms', 'Bathrooms', 'Pool', 'Market value', 'Last sale date',
-                'Last sale amount', 'Latitude', 'Longitude', 'My notes', 'Voice notes'];
+                'Last sale amount', 'Latitude', 'Longitude', 'My notes', 'Voice notes', 'Photos'];
   const q = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   const lines = [head.join(',')];
   for (const i of sortedTop(current)) {
     const r = rows[i];
     lines.push([parcelFmt(r[P]), r[OWNER], r[STREET], cityOf(r), r[ZIP], r[MAIL] || 'Same as home',
       D.dors[r[DOR]], D.subs[r[SUB]], r[YB], r[SQFT], r[BD], r[BA], r[POOL] ? 'Yes' : 'No', r[VALUE],
-      r[LSD], r[LSA], r[LAT], r[LON], notes[r[P]]?.text || '', voiceCounts.get(r[P]) || ''].map(q).join(','));
+      r[LSD], r[LSA], r[LAT], r[LON], notes[r[P]]?.text || '', voiceCounts.get(r[P]) || '', photoCounts.get(r[P]) || ''].map(q).join(','));
   }
   saveFile('homeowners.csv', '﻿' + lines.join('\r\n'), 'text/csv');
 });
@@ -734,25 +934,51 @@ const blobToDataUrl = blob => new Promise((res, rej) => {
 });
 const homeInfo = p => { const r = rowByParcel.get(p); return { address: r ? addressOf(r) : '', owner: r ? r[OWNER] : '' }; };
 
+const getAllMedia = async name => { try { return await vstore('readonly', s => s.getAll(), name) || []; } catch (e) { return []; } };
+
 $('#backupNotes').addEventListener('click', async () => {
-  let clips = [];
-  try { clips = await vstore('readonly', s => s.getAll()) || []; } catch (e) { clips = []; }
+  const clips = await getAllMedia('voice'), pics = await getAllMedia('photos');
   const textCount = Object.keys(notes).length;
-  if (!textCount && !clips.length) { notesMsg('There are no notes to back up yet. Open a home on the map and type or record a note.'); return; }
+  if (!textCount && !clips.length && !pics.length) {
+    notesMsg('There are no notes to back up yet. Open a home on the map and add a text, voice or photo note.'); return;
+  }
   notesMsg('Preparing backup…');
   const out = {};
   for (const [p, n] of Object.entries(notes)) out[p] = { ...n, ...homeInfo(p) };
-  const voice = [];
-  for (const c of clips) {
-    voice.push({ parcel: c.parcel, ...homeInfo(c.parcel), created: c.created, duration: c.duration, type: c.type,
-                 audio: await blobToDataUrl(c.blob) });
-  }
-  const backup = { app: 'HomeOwners', kind: 'notes-backup', version: 2, exported: new Date().toISOString(),
-                   textNotes: textCount, voiceNotes: voice.length, notes: out, voice };
+  const voice = [], photos = [];
+  for (const c of clips)
+    voice.push({ parcel: c.parcel, ...homeInfo(c.parcel), created: c.created, duration: c.duration, type: c.type, audio: await blobToDataUrl(c.blob) });
+  for (const ph of pics)
+    photos.push({ parcel: ph.parcel, ...homeInfo(ph.parcel), created: ph.created, type: ph.type, image: await blobToDataUrl(ph.blob) });
+  const backup = { app: 'HomeOwners', kind: 'notes-backup', version: 3, exported: new Date().toISOString(),
+                   textNotes: textCount, voiceNotes: voice.length, photoNotes: photos.length, notes: out, voice, photos };
   const day = new Date().toISOString().slice(0, 10);
-  saveFile(`homeowners-notes-${day}.json`, JSON.stringify(backup), 'application/json');
-  notesMsg(`Backed up ${plural(textCount, 'text note')} and ${plural(voice.length, 'voice note')} to homeowners-notes-${day}.json. Keep that file somewhere safe (email it to yourself or put it in OneDrive).`);
+  const json = JSON.stringify(backup);
+  saveFile(`homeowners-notes-${day}.json`, json, 'application/json');
+  stamp.set('homeowners.lastBackup', new Date().toISOString());
+  updateNoteCount();
+  const mb = json.length / 1e6;
+  notesMsg(`Backed up ${plural(textCount, 'text note')}, ${plural(voice.length, 'voice note')} and ${plural(photos.length, 'photo')} ` +
+           `to homeowners-notes-${day}.json${mb >= 1 ? ` (${mb.toFixed(1)} MB)` : ''}. Keep that file somewhere safe (email it to yourself or put it in OneDrive).`);
 });
+
+// add backed-up voice clips or photos this device doesn't already have (same home + same time = same item)
+async function restoreMedia(name, list, dataKey, extra) {
+  const res = { added: 0, skipped: 0, failed: 0 };
+  if (!Array.isArray(list) || !list.length) return res;
+  const have = new Set((await getAllMedia(name)).map(c => c.parcel + '|' + c.created));
+  for (const v of list) {
+    const data = v && v[dataKey];
+    if (!v || !v.parcel || !v.created || typeof data !== 'string' || !data.startsWith('data:')) { res.failed++; continue; }
+    if (have.has(v.parcel + '|' + v.created)) { res.skipped++; continue; }
+    try {
+      const blob = await (await fetch(data)).blob();
+      await mediaAdd(name, { parcel: v.parcel, created: v.created, type: v.type || blob.type, ...extra(v), blob });
+      have.add(v.parcel + '|' + v.created); res.added++;
+    } catch (e) { res.failed++; }
+  }
+  return res;
+}
 $('#restoreNotes').addEventListener('click', () => $('#restoreFile').click());
 $('#restoreFile').addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = '';
@@ -774,28 +1000,17 @@ $('#restoreFile').addEventListener('change', async e => {
     else kept++;
   }
   if (!persistNotes()) return;
-  // voice notes (backups from version 2 on): add any clip this device doesn't already have
-  let vAdded = 0, vSkipped = 0, vFailed = 0;
-  if (Array.isArray(data.voice) && data.voice.length) {
-    notesMsg(`Restoring ${plural(data.voice.length, 'voice note')}…`);
-    const have = new Set();
-    try { (await vstore('readonly', s => s.getAll()) || []).forEach(c => have.add(c.parcel + '|' + c.created)); } catch (e) {}
-    for (const v of data.voice) {
-      if (!v || !v.parcel || !v.created || typeof v.audio !== 'string' || !v.audio.startsWith('data:')) { vFailed++; continue; }
-      if (have.has(v.parcel + '|' + v.created)) { vSkipped++; continue; }
-      try {
-        const blob = await (await fetch(v.audio)).blob();
-        await voiceAdd({ parcel: v.parcel, created: v.created, duration: v.duration || 0, type: v.type || blob.type, blob });
-        have.add(v.parcel + '|' + v.created); vAdded++;
-      } catch (e) { vFailed++; }
-    }
-  }
+  // voice notes (backup version 2+) and photos (version 3+)
+  if ((data.voice?.length || 0) + (data.photos?.length || 0)) notesMsg('Restoring voice notes and photos…');
+  const v = await restoreMedia('voice', data.voice, 'audio', x => ({ duration: x.duration || 0 }));
+  const ph = await restoreMedia('photos', data.photos, 'image', () => ({}));
   updateNoteCount();
   markers.forEach((m, i) => m && m.setStyle(dotStyle(rows[i][P])));
   map.closePopup();
   search({ redraw: $('#hasNotes').checked });
+  const part = (label, r) => `${label}: ${r.added} new, ${r.skipped} already here${r.failed ? `, ${r.failed} could not be read` : ''}.`;
   notesMsg(`Restored from ${file.name}. Text notes: ${added} new, ${updated} updated, ${kept} already up to date. ` +
-           `Voice notes: ${vAdded} new, ${vSkipped} already here${vFailed ? `, ${vFailed} could not be read` : ''}.`, vFailed > 0);
+           part('Voice notes', v) + ' ' + part('Photos', ph), v.failed + ph.failed > 0);
 });
 
 // ---------- mobile drawer / list sheet
@@ -825,7 +1040,7 @@ function countBy(col) { const c = new Map(); for (const r of rows) c.set(r[col],
   }
   rows = D.rows;
   rows.forEach(r => rowByParcel.set(r[P], r));
-  try { await loadVoiceCounts(); } catch (e) { /* no voice storage in this browser */ }
+  try { await loadCounts('voice'); await loadCounts('photos'); } catch (e) { /* no device storage in this browser */ }
   updateNoteCount();
   if (!notesOk) notesMsg('This browser is not letting the site save notes (private browsing or storage turned off).', true);
   hay = rows.map(r => `${r[OWNER]} ${r[STREET]} ${D.cities[r[CITY]]} ${r[P]} ${parcelFmt(r[P])}`.toUpperCase());
