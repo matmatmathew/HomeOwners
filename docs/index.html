@@ -76,6 +76,22 @@
   .popup .note-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; font-size: 12px; color: #667085; }
   .popup .note-row button { padding: 3px 8px; font-size: 12px; background: #fff; color: #1d2330; border-color: #c9cdd4; }
   .pill.noted { background: #7b3fe4; }
+  /* tall popups scroll inside themselves instead of running off the screen */
+  .leaflet-popup-content { max-height: calc(100vh - 140px); overflow-y: auto; overscroll-behavior: contain; }
+  .popup .voice { margin-top: 8px; }
+  .popup .voice-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .popup .vlabel { font-weight: 600; font-size: 12px; }
+  .popup .rec-btn { padding: 4px 10px; font-size: 12px; background: #fff; color: #c62828; border-color: #e3a5a5; font-weight: 600; }
+  .popup .rec-btn.recording { background: #c62828; color: #fff; border-color: #c62828; }
+  .popup .voice-msg { font-size: 12px; color: #667085; min-height: 0; margin-top: 2px; }
+  .popup .voice-msg.err { color: #c62828; }
+  .popup .voice-list { max-height: 170px; overflow-y: auto; }
+  .popup .clip { margin-top: 6px; }
+  .popup .clip audio { width: 100%; height: 36px; display: block; }
+  .popup .clip-meta { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 11px; color: #667085; }
+  .popup .clip-del { padding: 2px 8px; font-size: 11px; background: #fff; color: #1d2330; border-color: #c9cdd4; }
+  @media (prefers-reduced-motion: no-preference) { .popup .rec-btn.recording { animation: recpulse 1.2s ease-in-out infinite; } }
+  @keyframes recpulse { 50% { opacity: .65; } }
   #mbar, .mobile-only { display: none; }
   .locate-btn { width: 34px; height: 34px; display: flex !important; align-items: center; justify-content: center;
                 background: #fff; color: #444; border-radius: 4px; cursor: pointer; }
@@ -112,9 +128,10 @@
     th, td { padding: 9px 8px; }
     .c-city, .c-zip, .c-dor, .c-sub, .c-yearBuilt, .c-sqft, .c-beds,
     .c-baths, .c-lastSaleDate, .c-lastSaleAmt { display: none; }
-    .leaflet-popup-content { margin: 10px 12px; }
+    .leaflet-popup-content { margin: 10px 12px; max-height: calc(100vh - 200px); max-height: calc(100dvh - 200px); }
     .popup textarea { font-size: 16px; } /* stops iOS zoom-on-focus */
-    .popup .note-row button { padding: 7px 12px; }
+    .popup .note-row button, .popup .rec-btn, .popup .clip-del { padding: 8px 12px; font-size: 13px; }
+    .popup .voice-list { max-height: 140px; }
     .locate-btn { width: 44px; height: 44px; }
     .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 40px; }
   }
@@ -135,7 +152,7 @@
       <button id="restoreNotes" type="button">Restore notes</button>
       <input type="file" id="restoreFile" accept=".json,application/json" hidden>
     </div>
-    <div class="msg" id="notesMsg">Notes are saved in this browser on this device only. Back them up to keep them safe or move them to another device.</div>
+    <div class="msg" id="notesMsg">Text and voice notes are saved in this browser on this device only. Back them up to keep them safe or move them to another device.</div>
   </section>
 
   <label class="f" for="q">Owner, address or parcel</label>
@@ -236,9 +253,61 @@ function persistNotes() {
   try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); return true; }
   catch (e) { notesMsg('This browser is not letting the site save notes (private browsing or storage turned off).', true); return false; }
 }
-const hasNote = p => !!(notes[p] && notes[p].text);
+// a home "has notes" if it has a text note or at least one voice note
+const hasNote = p => !!(notes[p] && notes[p].text) || (voiceCounts.get(p) || 0) > 0;
 function notesMsg(text, err) { const m = $('#notesMsg'); m.textContent = text; m.classList.toggle('err', !!err); }
-function updateNoteCount() { $('#noteCount').textContent = Object.keys(notes).length.toLocaleString(); }
+function updateNoteCount() {
+  const homes = new Set(Object.keys(notes));
+  voiceCounts.forEach((n, p) => { if (n > 0) homes.add(p); });
+  $('#noteCount').textContent = homes.size.toLocaleString() + (homes.size === 1 ? ' home' : ' homes');
+}
+
+// ---------- voice notes: audio clips kept in this browser's database (IndexedDB)
+const voiceCounts = new Map();   // parcel -> number of clips
+let voiceDbP = null;
+function voiceDb() {
+  if (!voiceDbP) voiceDbP = new Promise((res, rej) => {
+    const req = indexedDB.open('homeowners', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('voice', { keyPath: 'id', autoIncrement: true }).createIndex('parcel', 'parcel');
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+  return voiceDbP;
+}
+async function vstore(mode, fn) {
+  const db = await voiceDb();
+  return new Promise((res, rej) => {
+    const t = db.transaction('voice', mode), s = t.objectStore('voice');
+    let out; const req = fn(s);
+    if (req) req.onsuccess = () => { out = req.result; };
+    t.oncomplete = () => res(out);
+    t.onerror = t.onabort = () => rej(t.error);
+  });
+}
+async function loadVoiceCounts() {           // counts clips per home without loading any audio
+  const db = await voiceDb();
+  return new Promise(res => {
+    const req = db.transaction('voice').objectStore('voice').index('parcel').openKeyCursor();
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) return res();
+      voiceCounts.set(c.key, (voiceCounts.get(c.key) || 0) + 1);
+      c.continue();
+    };
+    req.onerror = () => res();
+  });
+}
+const voiceList = p => vstore('readonly', s => s.index('parcel').getAll(p));
+async function voiceAdd(rec) {
+  await vstore('readwrite', s => s.add(rec));
+  voiceCounts.set(rec.parcel, (voiceCounts.get(rec.parcel) || 0) + 1);
+  if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});   // ask the browser not to auto-clear
+}
+async function voiceDelete(id, p) {
+  await vstore('readwrite', s => s.delete(id));
+  voiceCounts.set(p, Math.max(0, (voiceCounts.get(p) || 0) - 1));
+}
+const fmtDur = ms => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const DOT = { home: '#1a7f4b', noted: '#7b3fe4' };
 const dotStyle = p => ({ radius: 9, color: '#fff', weight: 2, fillColor: hasNote(p) ? DOT.noted : DOT.home, fillOpacity: 0.95 });
 
@@ -294,7 +363,7 @@ function popupHtml(i) {
   const r = rows[i], n = notes[r[P]];
   return `<div class="popup">
     <h3>${esc(addressOf(r))}</h3>
-    <div><span class="pill">Owner lives here</span>${n ? ' <span class="pill noted">My notes</span>' : ''} ${esc(typeName(D.dors[r[DOR]]))}</div>
+    <div><span class="pill">Owner lives here</span>${hasNote(r[P]) ? ' <span class="pill noted">My notes</span>' : ''} ${esc(typeName(D.dors[r[DOR]]))}</div>
     <table>
       <tr><th>Owner</th><td>${esc(r[OWNER])}</td></tr>
       <tr><th>Tax bill to</th><td>${r[MAIL] ? esc(r[MAIL]) : 'This home'}</td></tr>
@@ -307,6 +376,11 @@ function popupHtml(i) {
       <label for="note-${i}">My notes</label>
       <textarea id="note-${i}" data-i="${i}" placeholder="Type a note about this home. It saves automatically.">${esc(n ? n.text : '')}</textarea>
       <div class="note-row"><button type="button" class="note-del" data-i="${i}"${n ? '' : ' hidden'}>Delete note</button><span class="note-status">${esc(savedWhen(r[P]))}</span></div>
+      <div class="voice" data-i="${i}">
+        <div class="voice-head"><span class="vlabel">Voice notes</span><button type="button" class="rec-btn" data-i="${i}">● Record</button></div>
+        <div class="voice-msg" role="status"></div>
+        <div class="voice-list"></div>
+      </div>
     </div>
     <div class="sales">Loading sales…</div>
   </div>`;
@@ -316,13 +390,20 @@ async function openHome(i, marker) {
   const r = rows[i];
   const opts = { maxWidth: popupW(), autoPanPaddingTopLeft: [10, isMobile() ? 70 : 10] };
   const popup = L.popup(opts).setContent(popupHtml(i));
+  popup.audioUrls = [];
+  popup.on('remove', () => { popup.audioUrls.forEach(u => URL.revokeObjectURL(u)); popup.audioUrls = []; });
+  currentPopup = popup;
   if (marker) marker.unbindPopup().bindPopup(popup).openPopup();
   else popup.setLatLng([r[LAT], r[LON]]).openOn(map);
+  renderVoice(i);
   const sales = await salesFor(r[P]);
   // fill in only the sales part, so a note being typed is not wiped out
   const el = popup.getElement()?.querySelector('.sales');
   if (el) el.innerHTML = salesHtml(sales);
+  refit(popup);
 }
+// the popup grows when sales and voice notes load; pan again so it stays fully on screen
+function refit(popup) { if (popup && popup.isOpen() && typeof popup._adjustPan === 'function') popup._adjustPan(); }
 
 // note editing inside popups: autosave shortly after typing stops
 function saveNote(i, text) {
@@ -335,8 +416,120 @@ function saveNote(i, text) {
   updateNoteCount();
   if (markers[i]) markers[i].setStyle(dotStyle(p));
   if (had !== hasNote(p) && $('#hasNotes').checked) debounced();
-  return hasNote(p);
+  return !!notes[p];
 }
+function homeNotesChanged(i, had) {   // after a voice clip is added or removed
+  const p = rows[i][P];
+  updateNoteCount();
+  if (markers[i]) markers[i].setStyle(dotStyle(p));
+  if (had !== hasNote(p) && $('#hasNotes').checked) debounced();
+}
+
+// ---------- voice recording in the popup
+let currentPopup = null;
+const voiceBox = i => document.querySelector(`.popup .voice[data-i="${i}"]`);
+function voiceMsg(i, text, err) {
+  const m = voiceBox(i)?.querySelector('.voice-msg'); if (!m) return;
+  m.textContent = text; m.classList.toggle('err', !!err);
+}
+async function renderVoice(i) {
+  const box = voiceBox(i); if (!box) return;
+  let clips = [];
+  try { clips = await voiceList(rows[i][P]); }
+  catch (e) { voiceMsg(i, 'This browser is not letting the site save voice notes (private browsing or storage turned off).', true); return; }
+  const list = voiceBox(i)?.querySelector('.voice-list'); if (!list || !currentPopup) return;
+  const popup = currentPopup;
+  popup.audioUrls.forEach(u => URL.revokeObjectURL(u)); popup.audioUrls = [];
+  clips.sort((a, b) => b.created.localeCompare(a.created));
+  list.innerHTML = clips.map(c => {
+    const url = URL.createObjectURL(c.blob); popup.audioUrls.push(url);
+    return `<div class="clip"><audio controls preload="metadata" src="${url}"></audio>
+      <div class="clip-meta"><span>${esc(new Date(c.created).toLocaleString())} · ${fmtDur(c.duration || 0)}</span>
+      <button type="button" class="clip-del" data-id="${c.id}" data-i="${i}">Delete</button></div></div>`;
+  }).join('');
+  // (no popup.update(): it would re-render the popup and wipe a note being typed)
+  refit(popup);
+}
+
+let rec = null;   // the recording in progress: { i, mr, chunks, start, stream, timer }
+const MAX_REC_MS = 5 * 60 * 1000;
+function pickAudioType() {
+  if (!window.MediaRecorder) return null;
+  for (const t of ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg;codecs=opus'])
+    if (MediaRecorder.isTypeSupported?.(t)) return t;
+  return '';
+}
+async function startRec(i) {
+  if (rec) await stopRec();
+  const type = pickAudioType();
+  if (type === null || !navigator.mediaDevices?.getUserMedia) { voiceMsg(i, 'This browser cannot record audio. Try Chrome or Safari.', true); return; }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) {
+    voiceMsg(i, e.name === 'NotAllowedError'
+      ? 'Microphone access is blocked. Allow the microphone for this site in your browser settings, then try again.'
+      : 'Could not start the microphone: ' + e.message, true);
+    return;
+  }
+  const mr = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+  const r = rec = { i, mr, chunks: [], start: Date.now(), stream, type: mr.mimeType || type || 'audio/webm' };
+  // keep a local reference: the last chunk arrives after stopRec() has cleared `rec`
+  mr.ondataavailable = e => { if (e.data && e.data.size) r.chunks.push(e.data); };
+  mr.start(1000);
+  voiceMsg(i, '');
+  const tick = () => {
+    if (rec !== r) return;
+    const btn = voiceBox(i)?.querySelector('.rec-btn');
+    const ms = Date.now() - r.start;
+    if (btn) { btn.textContent = `■ Stop ${fmtDur(ms)}`; btn.classList.add('recording'); }
+    if (ms >= MAX_REC_MS) stopRec();
+  };
+  tick(); rec.timer = setInterval(tick, 500);
+}
+function stopRec() {
+  if (!rec) return Promise.resolve();
+  const r = rec; rec = null;
+  clearInterval(r.timer);
+  return new Promise(done => {
+    r.mr.onstop = async () => {
+      r.stream.getTracks().forEach(t => t.stop());
+      const btn = voiceBox(r.i)?.querySelector('.rec-btn');
+      if (btn) { btn.textContent = '● Record'; btn.classList.remove('recording'); }
+      const blob = new Blob(r.chunks, { type: r.type });
+      const duration = Date.now() - r.start;
+      if (blob.size && duration > 700) {
+        const p = rows[r.i][P], had = hasNote(p);
+        try {
+          await voiceAdd({ parcel: p, created: new Date().toISOString(), duration, type: r.type, blob });
+          homeNotesChanged(r.i, had);
+          voiceMsg(r.i, 'Voice note saved.');
+          renderVoice(r.i);
+        } catch (e) { voiceMsg(r.i, 'Could not save the voice note: ' + (e?.message || e), true); }
+      } else voiceMsg(r.i, 'Recording was too short, so it was not saved.');
+      done();
+    };
+    r.mr.stop();
+  });
+}
+document.addEventListener('click', async e => {
+  const recBtn = e.target.closest('.popup .rec-btn');
+  if (recBtn) { const i = Number(recBtn.dataset.i); if (rec && rec.i === i) stopRec(); else startRec(i); return; }
+  const del = e.target.closest('.popup .clip-del');
+  if (del) {
+    if (!del.dataset.armed) {          // first tap arms, second tap deletes (avoids accidental taps)
+      del.dataset.armed = '1'; del.textContent = 'Tap again to delete';
+      setTimeout(() => { if (del.isConnected) { delete del.dataset.armed; del.textContent = 'Delete'; } }, 3000);
+      return;
+    }
+    const i = Number(del.dataset.i), p = rows[i][P], had = hasNote(p);
+    await voiceDelete(Number(del.dataset.id), p);
+    homeNotesChanged(i, had);
+    voiceMsg(i, 'Voice note deleted.');
+    renderVoice(i);
+  }
+});
+// closing the popup stops (and saves) a recording in progress
+map.on('popupclose', () => { if (rec) stopRec(); });
 const noteTimers = {};
 document.addEventListener('input', e => {
   const ta = e.target.closest('.popup textarea'); if (!ta) return;
@@ -493,8 +686,10 @@ $('#body').addEventListener('click', e => {
   const tr = e.target.closest('tr'); if (!tr) return;
   const i = Number(tr.dataset.i), m = markerFor(i);
   if (isMobile()) setList(false);
-  if (cluster.hasLayer(m)) cluster.zoomToShowLayer(m, () => openHome(i, m));
-  else { map.setView([rows[i][LAT], rows[i][LON]], 18); openHome(i); }
+  const plain = () => { map.setView([rows[i][LAT], rows[i][LON]], 18); openHome(i); };
+  // zoomToShowLayer can fail while the dots are still being added right after a search
+  if (cluster.hasLayer(m)) { try { cluster.zoomToShowLayer(m, () => openHome(i, m)); } catch (err) { plain(); } }
+  else plain();
 });
 
 let timer;
@@ -512,14 +707,14 @@ $('#reset').addEventListener('click', () => {
 $('#export').addEventListener('click', () => {
   const head = ['Parcel', 'Owner', 'Street', 'City', 'ZIP', 'Tax bill mailed to', 'Property type', 'Subdivision',
                 'Year built', 'Living sq ft', 'Bedrooms', 'Bathrooms', 'Pool', 'Market value', 'Last sale date',
-                'Last sale amount', 'Latitude', 'Longitude', 'My notes'];
+                'Last sale amount', 'Latitude', 'Longitude', 'My notes', 'Voice notes'];
   const q = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   const lines = [head.join(',')];
   for (const i of sortedTop(current)) {
     const r = rows[i];
     lines.push([parcelFmt(r[P]), r[OWNER], r[STREET], cityOf(r), r[ZIP], r[MAIL] || 'Same as home',
       D.dors[r[DOR]], D.subs[r[SUB]], r[YB], r[SQFT], r[BD], r[BA], r[POOL] ? 'Yes' : 'No', r[VALUE],
-      r[LSD], r[LSA], r[LAT], r[LON], notes[r[P]]?.text || ''].map(q).join(','));
+      r[LSD], r[LSA], r[LAT], r[LON], notes[r[P]]?.text || '', voiceCounts.get(r[P]) || ''].map(q).join(','));
   }
   saveFile('homeowners.csv', '﻿' + lines.join('\r\n'), 'text/csv');
 });
@@ -533,18 +728,30 @@ function saveFile(name, text, type) {
 
 // ---------- notes backup / restore (a .json file the user keeps)
 const rowByParcel = new Map();
-$('#backupNotes').addEventListener('click', () => {
-  const count = Object.keys(notes).length;
-  if (!count) { notesMsg('There are no notes to back up yet. Open a home on the map and type in "My notes".'); return; }
+const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`;
+const blobToDataUrl = blob => new Promise((res, rej) => {
+  const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob);
+});
+const homeInfo = p => { const r = rowByParcel.get(p); return { address: r ? addressOf(r) : '', owner: r ? r[OWNER] : '' }; };
+
+$('#backupNotes').addEventListener('click', async () => {
+  let clips = [];
+  try { clips = await vstore('readonly', s => s.getAll()) || []; } catch (e) { clips = []; }
+  const textCount = Object.keys(notes).length;
+  if (!textCount && !clips.length) { notesMsg('There are no notes to back up yet. Open a home on the map and type or record a note.'); return; }
+  notesMsg('Preparing backup…');
   const out = {};
-  for (const [p, n] of Object.entries(notes)) {
-    const r = rowByParcel.get(p);
-    out[p] = { ...n, address: r ? addressOf(r) : '', owner: r ? r[OWNER] : '' };
+  for (const [p, n] of Object.entries(notes)) out[p] = { ...n, ...homeInfo(p) };
+  const voice = [];
+  for (const c of clips) {
+    voice.push({ parcel: c.parcel, ...homeInfo(c.parcel), created: c.created, duration: c.duration, type: c.type,
+                 audio: await blobToDataUrl(c.blob) });
   }
-  const backup = { app: 'HomeOwners', kind: 'notes-backup', version: 1, exported: new Date().toISOString(), count, notes: out };
+  const backup = { app: 'HomeOwners', kind: 'notes-backup', version: 2, exported: new Date().toISOString(),
+                   textNotes: textCount, voiceNotes: voice.length, notes: out, voice };
   const day = new Date().toISOString().slice(0, 10);
-  saveFile(`homeowners-notes-${day}.json`, JSON.stringify(backup, null, 2), 'application/json');
-  notesMsg(`Backed up ${count.toLocaleString()} note${count === 1 ? '' : 's'} to homeowners-notes-${day}.json. Keep that file somewhere safe (email it to yourself or put it in OneDrive).`);
+  saveFile(`homeowners-notes-${day}.json`, JSON.stringify(backup), 'application/json');
+  notesMsg(`Backed up ${plural(textCount, 'text note')} and ${plural(voice.length, 'voice note')} to homeowners-notes-${day}.json. Keep that file somewhere safe (email it to yourself or put it in OneDrive).`);
 });
 $('#restoreNotes').addEventListener('click', () => $('#restoreFile').click());
 $('#restoreFile').addEventListener('change', async e => {
@@ -567,11 +774,28 @@ $('#restoreFile').addEventListener('change', async e => {
     else kept++;
   }
   if (!persistNotes()) return;
+  // voice notes (backups from version 2 on): add any clip this device doesn't already have
+  let vAdded = 0, vSkipped = 0, vFailed = 0;
+  if (Array.isArray(data.voice) && data.voice.length) {
+    notesMsg(`Restoring ${plural(data.voice.length, 'voice note')}…`);
+    const have = new Set();
+    try { (await vstore('readonly', s => s.getAll()) || []).forEach(c => have.add(c.parcel + '|' + c.created)); } catch (e) {}
+    for (const v of data.voice) {
+      if (!v || !v.parcel || !v.created || typeof v.audio !== 'string' || !v.audio.startsWith('data:')) { vFailed++; continue; }
+      if (have.has(v.parcel + '|' + v.created)) { vSkipped++; continue; }
+      try {
+        const blob = await (await fetch(v.audio)).blob();
+        await voiceAdd({ parcel: v.parcel, created: v.created, duration: v.duration || 0, type: v.type || blob.type, blob });
+        have.add(v.parcel + '|' + v.created); vAdded++;
+      } catch (e) { vFailed++; }
+    }
+  }
   updateNoteCount();
   markers.forEach((m, i) => m && m.setStyle(dotStyle(rows[i][P])));
   map.closePopup();
   search({ redraw: $('#hasNotes').checked });
-  notesMsg(`Restored from ${file.name}: ${added} new, ${updated} updated, ${kept} already up to date.`);
+  notesMsg(`Restored from ${file.name}. Text notes: ${added} new, ${updated} updated, ${kept} already up to date. ` +
+           `Voice notes: ${vAdded} new, ${vSkipped} already here${vFailed ? `, ${vFailed} could not be read` : ''}.`, vFailed > 0);
 });
 
 // ---------- mobile drawer / list sheet
@@ -601,6 +825,7 @@ function countBy(col) { const c = new Map(); for (const r of rows) c.set(r[col],
   }
   rows = D.rows;
   rows.forEach(r => rowByParcel.set(r[P], r));
+  try { await loadVoiceCounts(); } catch (e) { /* no voice storage in this browser */ }
   updateNoteCount();
   if (!notesOk) notesMsg('This browser is not letting the site save notes (private browsing or storage turned off).', true);
   hay = rows.map(r => `${r[OWNER]} ${r[STREET]} ${D.cities[r[CITY]]} ${r[P]} ${parcelFmt(r[P])}`.toUpperCase());
