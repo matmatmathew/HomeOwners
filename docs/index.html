@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Map of owner-occupied (homestead exemption) homes in Seminole County, Florida.">
+<title>HomeOwners</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #e3e6eb;
+    --accent: #1f6feb; --home: #1a7f4b; --row-hover: #eef4ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --panel: #1a1e26; --text: #e6e9ef; --muted: #9aa3b2; --line: #2a303b;
+      --accent: #5b9bff; --home: #3fbf7f; --row-hover: #222a38; color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+         display: grid; grid-template-columns: 330px 1fr; grid-template-rows: 100vh; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 14px 16px 24px; }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  .sub { color: var(--muted); margin-bottom: 4px; }
+  .about { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+  label.f { display: block; font-weight: 600; margin: 12px 0 4px; }
+  input[type=text], input[type=number], input[type=date], select {
+    width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--text); font: inherit; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .checks { max-height: 150px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; background: var(--bg); }
+  .checks label { display: flex; gap: 6px; align-items: center; padding: 2px 0; cursor: pointer; }
+  .checks .n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .row { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
+  .buttons { display: flex; gap: 8px; margin-top: 16px; position: sticky; bottom: -24px; background: var(--panel); padding: 10px 0; }
+  button { padding: 7px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  main { display: grid; grid-template-rows: 1fr 38vh; grid-template-columns: minmax(0, 1fr); min-width: 0; overflow: hidden; position: relative; }
+  #map { min-height: 0; min-width: 0; }
+  #loading { position: absolute; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center;
+             background: var(--bg); color: var(--text); font-size: 15px; font-weight: 600; }
+  #results { min-width: 0; border-top: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+  #status { padding: 8px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  #status b { font-size: 15px; }
+  #status .muted { color: var(--muted); }
+  .tablewrap { overflow: auto; flex: 1; }
+  table { border-collapse: collapse; width: 100%; white-space: nowrap; }
+  th, td { padding: 5px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+  th { position: sticky; top: 0; background: var(--panel); cursor: pointer; user-select: none; font-weight: 600; }
+  th.sorted::after { content: " ▾"; } th.sorted.asc::after { content: " ▴"; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr { cursor: pointer; } tbody tr:hover { background: var(--row-hover); }
+  .pill { display: inline-block; padding: 0 6px; border-radius: 10px; font-size: 11px; color: #fff; background: var(--home); }
+  .popup h3 { margin: 0 0 4px; font-size: 14px; }
+  .popup table { font-size: 12px; white-space: normal; }
+  .popup td, .popup th { padding: 2px 6px 2px 0; border: 0; position: static; background: none; cursor: default; }
+  .popup .sales { max-height: 140px; overflow-y: auto; margin-top: 6px; border-top: 1px solid #ddd; }
+  #mbar, .mobile-only { display: none; }
+  .locate-btn { width: 34px; height: 34px; display: flex !important; align-items: center; justify-content: center;
+                background: #fff; color: #444; border-radius: 4px; cursor: pointer; }
+  .locate-btn[data-state="busy"] { color: #999; }
+  .locate-btn[data-state="on"] { color: #1f6feb; }
+
+  /* ---------- phones & small tablets: full-screen map, filters drawer, list sheet */
+  @media (max-width: 800px) {
+    body { display: block; height: 100vh; height: 100dvh; overflow: hidden; }
+    main { position: fixed; inset: 0; display: block; }
+    #map { position: absolute; inset: 0; }
+    .mobile-only { display: revert; }
+    #mbar { display: flex; position: absolute; top: calc(10px + env(safe-area-inset-top)); left: 10px; right: 10px; z-index: 900; gap: 8px; align-items: center; }
+    #mbar button { box-shadow: 0 1px 4px rgba(0,0,0,.3); background: var(--panel); padding: 10px 14px; font-weight: 600; }
+    #mcount { flex: 1; text-align: center; background: var(--panel); border-radius: 6px; padding: 9px 8px;
+              box-shadow: 0 1px 4px rgba(0,0,0,.3); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    aside { position: fixed; inset: 0; z-index: 1100; border-right: 0; transform: translateX(-100%);
+            transition: transform .25s ease; padding-top: calc(14px + env(safe-area-inset-top)); padding-bottom: 0; }
+    aside.open { transform: none; }
+    .drawer-head { display: flex; align-items: center; gap: 8px; }
+    .drawer-head h1 { flex: 1; }
+    .buttons { bottom: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+    .buttons button { flex: 1; padding: 12px; }
+    input[type=text], input[type=number], input[type=date], select { font-size: 16px; padding: 9px 10px; } /* 16px stops iOS zoom-on-focus */
+    .checks { max-height: 190px; }
+    .checks label { padding: 7px 0; }
+    .row input[type=checkbox] { width: 20px; height: 20px; }
+    #results { position: absolute; left: 0; right: 0; bottom: 0; height: 55%; z-index: 1000; border-top: 0;
+               border-radius: 14px 14px 0 0; box-shadow: 0 -2px 10px rgba(0,0,0,.25);
+               transform: translateY(105%); transition: transform .25s ease; padding-bottom: env(safe-area-inset-bottom); }
+    #results.open { transform: none; }
+    #status { font-size: 12px; }
+    table { white-space: normal; }
+    th, td { padding: 9px 8px; }
+    .c-city, .c-zip, .c-dor, .c-sub, .c-yearBuilt, .c-sqft, .c-beds,
+    .c-baths, .c-lastSaleDate, .c-lastSaleAmt { display: none; }
+    .leaflet-popup-content { margin: 10px 12px; }
+    .locate-btn { width: 44px; height: 44px; }
+    .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 40px; }
+  }
+  @media (prefers-reduced-motion: reduce) { aside, #results { transition: none; } }
+</style>
+</head>
+<body>
+<aside>
+  <div class="drawer-head"><h1>HomeOwners</h1><button class="mobile-only" id="closeFilters" aria-label="Close filters">✕</button></div>
+  <div class="sub" id="summary">Seminole County, FL · loading…</div>
+  <p class="about">Every home shown has a homestead exemption, which means the owner lives there as their permanent residence.</p>
+
+  <label class="f" for="q">Owner, address or parcel</label>
+  <input type="text" id="q" placeholder="e.g. SMITH or CRICKLEWOOD">
+
+  <label class="f">City</label>
+  <div class="checks" id="city"></div>
+
+  <label class="f" for="zip">ZIP code</label>
+  <select id="zip" multiple size="4"></select>
+
+  <label class="f">Property type</label>
+  <div class="checks" id="dor"></div>
+
+  <label class="f" for="sub">Subdivision contains</label>
+  <input type="text" id="sub">
+
+  <label class="f">Market (just) value $</label>
+  <div class="pair"><input type="number" id="vmin" placeholder="min" step="10000" aria-label="Minimum value"><input type="number" id="vmax" placeholder="max" step="10000" aria-label="Maximum value"></div>
+
+  <label class="f">Year built</label>
+  <div class="pair"><input type="number" id="ybmin" placeholder="from" aria-label="Built from year"><input type="number" id="ybmax" placeholder="to" aria-label="Built to year"></div>
+
+  <label class="f">Bedrooms / bathrooms (at least)</label>
+  <div class="pair"><input type="number" id="bedmin" placeholder="beds" min="0" aria-label="Minimum bedrooms"><input type="number" id="bathmin" placeholder="baths" min="0" step="0.5" aria-label="Minimum bathrooms"></div>
+
+  <label class="f">Living area sq ft</label>
+  <div class="pair"><input type="number" id="samin" placeholder="min" step="100" aria-label="Minimum square feet"><input type="number" id="samax" placeholder="max" step="100" aria-label="Maximum square feet"></div>
+
+  <label class="f">Last sale date</label>
+  <div class="pair"><input type="date" id="lsmin" aria-label="Sold on or after"><input type="date" id="lsmax" aria-label="Sold on or before"></div>
+
+  <label class="f">Last sale price $</label>
+  <div class="pair"><input type="number" id="spmin" placeholder="min" step="10000" aria-label="Minimum sale price"><input type="number" id="spmax" placeholder="max" step="10000" aria-label="Maximum sale price"></div>
+
+  <label class="f" for="mail">Tax bill mailed to</label>
+  <select id="mail">
+    <option value="">Anywhere</option>
+    <option value="1">The home itself</option>
+    <option value="0">A different address</option>
+  </select>
+
+  <div class="row"><input type="checkbox" id="pool"><label for="pool">Has pool</label></div>
+  <div class="row"><input type="checkbox" id="inview"><label for="inview">Only what's visible on the map</label></div>
+
+  <p class="about" style="margin-top:14px">Source: Seminole County Property Appraiser, <span id="year">2026</span> tax roll. Sales history includes non-market transfers.</p>
+
+  <div class="buttons">
+    <button class="primary mobile-only" id="showResults">Show results</button>
+    <button class="primary" id="export">Export CSV</button>
+    <button id="reset">Reset</button>
+  </div>
+</aside>
+
+<main>
+  <div id="map"></div>
+  <div id="loading">Loading homes…</div>
+  <div id="mbar">
+    <button id="openFilters">Filters</button>
+    <span id="mcount">–</span>
+    <button id="toggleList">List</button>
+  </div>
+  <section id="results">
+    <div id="status"><b id="count">–</b><span class="muted" id="note"></span></div>
+    <div class="tablewrap"><table><thead><tr id="head"></tr></thead><tbody id="body"></tbody></table></div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const aside = $('aside');
+const fmt$ = v => v == null ? '' : '$' + Number(v).toLocaleString();
+const fmtN = v => v == null ? '' : Number(v).toLocaleString();
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const title = s => String(s || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+const typeName = d => title(String(d || '').replace(/^\S+ - /, ''));
+const isMobile = () => matchMedia('(max-width: 800px)').matches;
+const popupW = () => Math.min(420, innerWidth - 60);
+
+// row layout from build_site.py
+const P = 0, OWNER = 1, STREET = 2, CITY = 3, ZIP = 4, DOR = 5, SUB = 6, YB = 7, SQFT = 8, BD = 9, BA = 10,
+      POOL = 11, VALUE = 12, LSD = 13, LSA = 14, MAIL = 15, LAT = 16, LON = 17;
+let D = null, rows = [], hay = [];          // data, rows, search text per row
+const cityOf = r => D.cities[r[CITY]];
+const addressOf = r => `${r[STREET]}, ${title(cityOf(r))} FL ${r[ZIP]}`;
+const parcelFmt = p => [p.slice(0,2), p.slice(2,4), p.slice(4,6), p.slice(6,9), p.slice(9,13), p.slice(13,17)].join('-');
+
+const COLUMNS = [ // key, label, getter, numeric
+  ['owner', 'Owner', r => r[OWNER]], ['address', 'Address', r => r[STREET]],
+  ['city', 'City', r => title(cityOf(r))], ['zip', 'ZIP', r => r[ZIP]],
+  ['dor', 'Type', r => typeName(D.dors[r[DOR]])], ['sub', 'Subdivision', r => D.subs[r[SUB]]],
+  ['yearBuilt', 'Built', r => r[YB], 1], ['sqft', 'Sq ft', r => r[SQFT], 1],
+  ['beds', 'Bd', r => r[BD], 1], ['baths', 'Ba', r => r[BA], 1],
+  ['value', 'Value', r => r[VALUE], 1], ['lastSaleDate', 'Last sale', r => r[LSD]],
+  ['lastSaleAmt', 'Sale $', r => r[LSA], 1],
+];
+const COL = Object.fromEntries(COLUMNS.map(c => [c[0], c]));
+let sort = 'value', dir = 'desc';
+
+// ---------- map
+const map = L.map('map', { preferCanvas: true, zoomControl: false }).setView([28.70, -81.25], 11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+const cluster = L.markerClusterGroup({ chunkedLoading: true, disableClusteringAtZoom: 18, maxClusterRadius: 50 });
+map.addLayer(cluster);
+const markers = [];   // marker per row index, made on first use
+
+function markerFor(i) {
+  if (!markers[i]) {
+    const r = rows[i];
+    const m = L.circleMarker([r[LAT], r[LON]], { radius: 6, color: '#fff', weight: 1, fillColor: '#1a7f4b', fillOpacity: 0.9 });
+    m.on('click', () => openHome(i, m));
+    markers[i] = m;
+  }
+  return markers[i];
+}
+
+// sales history lives in 64 small files; must match bucket() in build_site.py
+const salesCache = {};
+function bucketOf(p) { let h = 0; for (const ch of p) h = (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0; return h % 64; }
+async function salesFor(p) {
+  const b = bucketOf(p);
+  if (!salesCache[b]) salesCache[b] = fetch(`data/sales/${b}.json`).then(r => r.json()).catch(() => ({}));
+  return (await salesCache[b])[p] || [];
+}
+
+function popupHtml(r, sales) {
+  const rowsHtml = sales.length ? sales.map(([d, amt, deed, qual]) =>
+    `<tr><td>${esc(d)}</td><td class="num">${fmt$(amt)}</td><td>${esc(title(deed))}</td><td>${esc(title(qual))}</td></tr>`).join('')
+    : '<tr><td>No sales on record</td></tr>';
+  return `<div class="popup">
+    <h3>${esc(addressOf(r))}</h3>
+    <div><span class="pill">Owner lives here</span> ${esc(typeName(D.dors[r[DOR]]))}</div>
+    <table>
+      <tr><th>Owner</th><td>${esc(r[OWNER])}</td></tr>
+      <tr><th>Tax bill to</th><td>${r[MAIL] ? esc(r[MAIL]) : 'This home'}</td></tr>
+      <tr><th>Parcel</th><td>${esc(parcelFmt(r[P]))}</td></tr>
+      <tr><th>Subdivision</th><td>${esc(D.subs[r[SUB]])}</td></tr>
+      <tr><th>Home</th><td>Built ${esc(r[YB] ?? '?')} · ${fmtN(r[SQFT])} sq ft · ${r[BD] ?? '?'} bd / ${r[BA] ?? '?'} ba${r[POOL] ? ' · pool' : ''}</td></tr>
+      <tr><th>Value</th><td>${fmt$(r[VALUE])} market value</td></tr>
+    </table>
+    <div class="sales"><table><tr><th>Sold</th><th>Amount</th><th>Deed</th><th>Type of sale</th></tr>${rowsHtml}</table></div>
+  </div>`;
+}
+
+async function openHome(i, marker) {
+  const r = rows[i];
+  const opts = { maxWidth: popupW(), autoPanPaddingTopLeft: [10, isMobile() ? 70 : 10] };
+  const popup = L.popup(opts).setContent(popupHtml(r, []).replace('No sales on record', 'Loading sales…'));
+  if (marker) marker.unbindPopup().bindPopup(popup).openPopup();
+  else popup.setLatLng([r[LAT], r[LON]]).openOn(map);
+  popup.setContent(popupHtml(r, await salesFor(r[P])));
+}
+
+// ---------- "find me": blue dot at your location
+let meDot = null, meRing = null, watching = false;
+const LocateControl = L.Control.extend({
+  options: { position: 'bottomright' },
+  onAdd() {
+    const b = L.DomUtil.create('a', 'leaflet-bar locate-btn');
+    b.href = '#'; b.title = 'Show my location'; b.setAttribute('role', 'button'); b.setAttribute('aria-label', 'Show my location');
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="currentColor" stroke-width="2"/></svg>';
+    L.DomEvent.disableClickPropagation(b);
+    L.DomEvent.on(b, 'click', e => { L.DomEvent.preventDefault(e); toggleLocate(); });
+    return b;
+  }
+});
+const locateCtl = new LocateControl().addTo(map);
+const setLocBtn = state => { locateCtl.getContainer().dataset.state = state; };
+function toggleLocate() {
+  if (watching) { map.stopLocate(); watching = false; setLocBtn(''); return; }
+  if (!window.isSecureContext || !navigator.geolocation) { alert('Location needs a secure (https) connection.'); return; }
+  watching = true; setLocBtn('busy');
+  map.locate({ watch: true, setView: false, enableHighAccuracy: true, maximumAge: 10000 });
+  map.once('locationfound', e => map.setView(e.latlng, Math.max(map.getZoom(), 17)));
+}
+map.on('locationfound', e => {
+  setLocBtn('on');
+  if (!meDot) {
+    meRing = L.circle(e.latlng, { radius: e.accuracy, color: '#1f6feb', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(map);
+    meDot = L.circleMarker(e.latlng, { radius: 8, color: '#fff', weight: 3, fillColor: '#1f6feb', fillOpacity: 1 }).addTo(map).bindTooltip('You are here');
+  } else { meDot.setLatLng(e.latlng); meRing.setLatLng(e.latlng).setRadius(e.accuracy); }
+});
+map.on('locationerror', e => {
+  watching = false; setLocBtn('');
+  alert(e.code === 1 ? 'Location permission was denied. Allow location for this site in your browser settings and try again.'
+                     : 'Could not get your location: ' + e.message);
+});
+
+// ---------- filtering (all in the browser)
+const val = id => $('#' + id).value.trim();
+const numv = id => { const v = val(id); return v === '' ? null : Number(v); };
+
+function currentFilter() {
+  const checked = id => new Set([...document.querySelectorAll(`#${id} input:checked`)].map(i => Number(i.value)));
+  const words = val('q').toUpperCase().split(/\s+/).filter(Boolean);
+  const subq = val('sub').toUpperCase();
+  const f = {
+    words, cities: checked('city'), dors: checked('dor'),
+    zips: new Set([...$('#zip').selectedOptions].map(o => o.value)),
+    subs: subq ? new Set(D.subs.map((s, i) => s.toUpperCase().includes(subq) ? i : -1).filter(i => i >= 0)) : null,
+    vmin: numv('vmin'), vmax: numv('vmax'), ybmin: numv('ybmin'), ybmax: numv('ybmax'),
+    bedmin: numv('bedmin'), bathmin: numv('bathmin'), samin: numv('samin'), samax: numv('samax'),
+    spmin: numv('spmin'), spmax: numv('spmax'), lsmin: val('lsmin'), lsmax: val('lsmax'),
+    mail: val('mail'), pool: $('#pool').checked, bounds: $('#inview').checked ? map.getBounds() : null,
+  };
+  return f;
+}
+
+const inRange = (v, lo, hi) => (lo == null || (v != null && v >= lo)) && (hi == null || (v != null && v <= hi));
+
+function matches(f) {
+  const out = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (f.cities.size && !f.cities.has(r[CITY])) continue;
+    if (f.dors.size && !f.dors.has(r[DOR])) continue;
+    if (f.zips.size && !f.zips.has(r[ZIP])) continue;
+    if (f.subs && !f.subs.has(r[SUB])) continue;
+    if (!inRange(r[VALUE], f.vmin, f.vmax) || !inRange(r[YB], f.ybmin, f.ybmax) || !inRange(r[SQFT], f.samin, f.samax)
+        || !inRange(r[BD], f.bedmin, null) || !inRange(r[BA], f.bathmin, null) || !inRange(r[LSA], f.spmin, f.spmax)) continue;
+    if (f.lsmin && !(r[LSD] && r[LSD] >= f.lsmin)) continue;
+    if (f.lsmax && !(r[LSD] && r[LSD] <= f.lsmax)) continue;
+    if (f.mail === '1' && r[MAIL]) continue;
+    if (f.mail === '0' && !r[MAIL]) continue;
+    if (f.pool && !r[POOL]) continue;
+    if (f.bounds && !f.bounds.contains([r[LAT], r[LON]])) continue;
+    if (f.words.length && !f.words.every(w => hay[i].includes(w))) continue;
+    out.push(i);
+  }
+  return out;
+}
+
+let current = [], lastKey = '';
+function search({ redraw = true } = {}) {
+  current = matches(currentFilter());
+  const n = current.length.toLocaleString();
+  $('#count').textContent = n + ' homes';
+  $('#mcount').textContent = n + ' homes';
+  $('#showResults').textContent = `Show ${n} results`;
+  $('#note').textContent = current.length > 250 ? 'table shows top 250 (Export CSV for all)' : '';
+  const key = current.length + ':' + current[0] + ':' + current[current.length - 1];
+  if (redraw && key !== lastKey) {
+    lastKey = key;
+    cluster.clearLayers();
+    cluster.addLayers(current.map(markerFor));
+  }
+  renderTable();
+}
+
+function sortedTop(list, limit) {
+  const [, , get, numeric] = COL[sort];
+  const sign = dir === 'asc' ? 1 : -1;
+  const keyed = list.map(i => [get(rows[i]), i]);
+  keyed.sort((a, b) => {
+    const x = a[0], y = b[0];
+    if (x == null || x === '') return 1;
+    if (y == null || y === '') return -1;
+    return (numeric ? x - y : String(x).localeCompare(String(y))) * sign;
+  });
+  return (limit ? keyed.slice(0, limit) : keyed).map(k => k[1]);
+}
+
+function renderTable() {
+  $('#head').innerHTML = COLUMNS.map(([k, label]) =>
+    `<th data-k="${k}" class="c-${k} ${k === sort ? 'sorted ' + dir : ''}">${label}</th>`).join('');
+  $('#body').innerHTML = sortedTop(current, 250).map(i => {
+    const r = rows[i];
+    return `<tr data-i="${i}">` + COLUMNS.map(([k, , get, numeric]) => {
+      let v = get(r);
+      if (k === 'value' || k === 'lastSaleAmt') v = fmt$(v);
+      else if (k === 'sqft') v = fmtN(v);
+      return `<td class="c-${k} ${numeric ? 'num' : ''}">${esc(v)}</td>`;
+    }).join('') + '</tr>';
+  }).join('');
+}
+
+$('#head').addEventListener('click', e => {
+  const k = e.target.dataset.k; if (!k) return;
+  if (k === sort) dir = dir === 'desc' ? 'asc' : 'desc';
+  else { sort = k; dir = COL[k][3] || k === 'lastSaleDate' ? 'desc' : 'asc'; }
+  renderTable();
+});
+$('#body').addEventListener('click', e => {
+  const tr = e.target.closest('tr'); if (!tr) return;
+  const i = Number(tr.dataset.i), m = markerFor(i);
+  if (isMobile()) setList(false);
+  if (cluster.hasLayer(m)) cluster.zoomToShowLayer(m, () => openHome(i, m));
+  else { map.setView([rows[i][LAT], rows[i][LON]], 18); openHome(i); }
+});
+
+let timer;
+const debounced = () => { clearTimeout(timer); timer = setTimeout(search, 300); };
+aside.addEventListener('input', debounced);
+aside.addEventListener('change', debounced);
+map.on('moveend', () => { if ($('#inview').checked) debounced(); });
+
+$('#reset').addEventListener('click', () => {
+  aside.querySelectorAll('input').forEach(el => el.type === 'checkbox' ? el.checked = false : el.value = '');
+  aside.querySelectorAll('select').forEach(el => { if (el.multiple) [...el.options].forEach(o => o.selected = false); else el.selectedIndex = 0; });
+  search();
+});
+
+$('#export').addEventListener('click', () => {
+  const head = ['Parcel', 'Owner', 'Street', 'City', 'ZIP', 'Tax bill mailed to', 'Property type', 'Subdivision',
+                'Year built', 'Living sq ft', 'Bedrooms', 'Bathrooms', 'Pool', 'Market value', 'Last sale date',
+                'Last sale amount', 'Latitude', 'Longitude'];
+  const q = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const lines = [head.join(',')];
+  for (const i of sortedTop(current)) {
+    const r = rows[i];
+    lines.push([parcelFmt(r[P]), r[OWNER], r[STREET], cityOf(r), r[ZIP], r[MAIL] || 'Same as home',
+      D.dors[r[DOR]], D.subs[r[SUB]], r[YB], r[SQFT], r[BD], r[BA], r[POOL] ? 'Yes' : 'No', r[VALUE],
+      r[LSD], r[LSA], r[LAT], r[LON]].map(q).join(','));
+  }
+  const url = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: 'homeowners.csv' });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+});
+
+// ---------- mobile drawer / list sheet
+function setList(open) {
+  $('#results').classList.toggle('open', open);
+  $('#toggleList').textContent = open ? 'Map' : 'List';
+}
+$('#openFilters').addEventListener('click', () => { setList(false); aside.classList.add('open'); });
+$('#closeFilters').addEventListener('click', () => aside.classList.remove('open'));
+$('#showResults').addEventListener('click', () => { aside.classList.remove('open'); setList(true); });
+$('#toggleList').addEventListener('click', () => setList(!$('#results').classList.contains('open')));
+addEventListener('resize', () => map.invalidateSize());
+
+// ---------- start
+function checkList(el, items) {
+  el.innerHTML = items.map(([value, label, n]) =>
+    `<label><input type="checkbox" value="${value}">${esc(label)}<span class="n">${n.toLocaleString()}</span></label>`).join('');
+}
+function countBy(col) { const c = new Map(); for (const r of rows) c.set(r[col], (c.get(r[col]) || 0) + 1); return [...c].sort((a, b) => b[1] - a[1]); }
+
+(async () => {
+  try {
+    D = await (await fetch('data/homes.json')).json();
+  } catch (e) {
+    $('#loading').textContent = 'Could not load the home data. Check your connection and reload the page.';
+    return;
+  }
+  rows = D.rows;
+  hay = rows.map(r => `${r[OWNER]} ${r[STREET]} ${D.cities[r[CITY]]} ${r[P]} ${parcelFmt(r[P])}`.toUpperCase());
+  $('#year').textContent = D.dataYear;
+  $('#summary').textContent = `${D.county} · ${rows.length.toLocaleString()} owner-occupied homes`;
+  checkList($('#city'), countBy(CITY).filter(([i]) => D.cities[i]).map(([i, n]) => [i, title(D.cities[i]), n]));
+  checkList($('#dor'), countBy(DOR).map(([i, n]) => [i, typeName(D.dors[i]), n]));
+  $('#zip').innerHTML = countBy(ZIP).sort((a, b) => a[0].localeCompare(b[0]))
+    .filter(([z]) => z).map(([z, n]) => `<option value="${z}">${z} (${n.toLocaleString()})</option>`).join('');
+  $('#loading').remove();
+  search();
+})();
+</script>
+</body>
+</html>
