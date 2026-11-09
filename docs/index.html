@@ -114,11 +114,6 @@
   .popup .photo-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
   .popup .photo-btn, .popup .photo-take { padding: 6px 8px; font-size: 12px; background: #fff; color: #5a2bb3; border: 1.5px solid #cdb8f6; font-weight: 600; }
   .popup .photo-take { background: #7b3fe4; color: #fff; border-color: #7b3fe4; }
-  .popup .popup-backup { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding-top: 8px;
-                         border-top: 1px dashed #cdb8f6; font-size: 12px; font-weight: 600; color: #3d2a66; }
-  .popup .popup-backup span { flex: 1; min-width: 80px; }
-  .popup .popup-backup button { padding: 5px 10px; font-size: 12px; font-weight: 600; background: #fff; color: #5a2bb3; border: 1.5px solid #7b3fe4; }
-  .popup .popup-backup .pb-backup { background: #7b3fe4; color: #fff; }
   #toast { position: fixed; left: 16px; right: 16px; margin: 0 auto; width: fit-content; bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 4000;
            max-width: 520px; background: #2b1d4a; color: #fff; padding: 12px 16px; border-radius: 10px;
            box-shadow: 0 4px 18px rgba(0,0,0,.3); font-size: 14px; line-height: 1.4; }
@@ -190,8 +185,10 @@
     .c-baths, .c-lastSaleDate, .c-lastSaleAmt { display: none; }
     .leaflet-popup-content { margin: 10px 12px; max-height: calc(100vh - 200px); max-height: calc(100dvh - 200px); }
     .popup textarea { font-size: 16px; } /* stops iOS zoom-on-focus */
-    .popup .note-row button, .popup .rec-btn, .popup .clip-del, .popup .photo-btn, .popup .photo-take,
-    .popup .popup-backup button { padding: 9px 12px; font-size: 13px; }
+    .popup .note-row button, .popup .rec-btn, .popup .clip-del, .popup .photo-btn, .popup .photo-take { padding: 9px 12px; font-size: 13px; }
+    #camera .vbar { justify-content: center; }
+    #camera .vbar span { flex-basis: 100%; text-align: center; }
+    #camera button { padding: 14px 22px; font-size: 16px; }
     .popup .voice-list { max-height: 140px; }
     .locate-btn { width: 44px; height: 44px; }
     .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 40px; }
@@ -517,11 +514,6 @@ function popupHtml(i) {
         <div class="photo-msg" role="status"></div>
         <div class="photo-grid"></div>
       </div>
-      <div class="popup-backup">
-        <span>All my notes:</span>
-        <button type="button" class="pb-backup">⬇ Back up</button>
-        <button type="button" class="pb-restore">⬆ Restore</button>
-      </div>
     </div>
     <div class="sales">Loading sales…</div>
   </div>`;
@@ -538,6 +530,7 @@ async function openHome(i, marker) {
     popup.audioUrls = []; popup.photoUrls = [];
   });
   currentPopup = popup;
+  session.set('homeowners.openHome', r[P]);
   if (marker) marker.unbindPopup().bindPopup(popup).openPopup();
   else popup.setLatLng([r[LAT], r[LON]]).openOn(map);
   // fit the popup inside the visible map (it scrolls inside itself if longer)
@@ -721,22 +714,20 @@ async function renderPhotos(i) {
   }).join('');
   refit(popup);
 }
-// phones and tablets open their own camera app; computers use the webcam window below
-const isTouchDevice = () => matchMedia('(pointer: coarse)').matches;
+// "Take photo" uses a camera view inside the page. Opening the phone's own camera app sends the
+// browser to the background, and phones often unload this (large) page meanwhile, losing the photo.
 document.addEventListener('click', e => {
   const btn = e.target.closest('.popup .photo-btn');
   if (btn) { photoBox(Number(btn.dataset.i))?.querySelector('.photo-input:not(.photo-cam)').click(); return; }
   const take = e.target.closest('.popup .photo-take');
   if (take) {
     const i = Number(take.dataset.i);
-    if (isTouchDevice() || !navigator.mediaDevices?.getUserMedia) photoBox(i)?.querySelector('.photo-cam').click();
-    else openCamera(i);
+    if (navigator.mediaDevices?.getUserMedia) openCamera(i);
+    else photoBox(i)?.querySelector('.photo-cam').click();   // very old browsers: the phone's camera app
     return;
   }
   const th = e.target.closest('.popup .thumb');
-  if (th) { openViewer(Number(th.dataset.i), Number(th.dataset.id), th.dataset.url, th.dataset.when); return; }
-  if (e.target.closest('.popup .pb-backup')) { $('#backupNotes').click(); return; }
-  if (e.target.closest('.popup .pb-restore')) $('#restoreFile').click();
+  if (th) openViewer(Number(th.dataset.i), Number(th.dataset.id), th.dataset.url, th.dataset.when);
 });
 document.addEventListener('change', e => {
   const input = e.target.closest('.popup .photo-input'); if (!input) return;
@@ -763,14 +754,14 @@ async function savePhotos(i, files) {
   }
 }
 
-// webcam window for "Take photo" on a computer
+// in-page camera for "Take photo" (rear camera on phones, webcam on a computer)
 let cam = null;   // { i, stream }
 async function openCamera(i) {
   let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } }, audio: false }); }
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false }); }
   catch (e) {
     if (e.name === 'NotAllowedError') { photoMsg(i, 'Camera access is blocked. Allow the camera for this site in your browser settings, then try again.', true); return; }
-    photoBox(i)?.querySelector('.photo-cam').click();   // no webcam: fall back to the file picker
+    photoBox(i)?.querySelector('.photo-cam').click();   // no usable camera here: fall back to the system picker
     return;
   }
   cam = { i, stream };
@@ -826,7 +817,29 @@ $('#viewerDelete').addEventListener('click', async () => {
 });
 
 // closing the popup stops (and saves) a recording in progress
-map.on('popupclose', () => { if (rec) stopRec(); });
+map.on('popupclose', e => {
+  if (rec) stopRec();
+  if (e.popup === currentPopup) session.del('homeowners.openHome');   // the user closed it (not replaced by another home)
+});
+
+// ---------- survive a reload: phones sometimes unload the page while another app (camera, files) is open.
+// Remember the map position and the open home for this browser tab, and put them back after a reload.
+const session = {
+  get: k => { try { return JSON.parse(sessionStorage.getItem(k) || 'null'); } catch (e) { return null; } },
+  set: (k, v) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del: k => { try { sessionStorage.removeItem(k); } catch (e) {} },
+};
+map.on('moveend', () => { const c = map.getCenter(); session.set('homeowners.view', [c.lat, c.lng, map.getZoom()]); });
+function restoreSession() {
+  const v = session.get('homeowners.view');
+  if (Array.isArray(v) && v.length === 3) map.setView([v[0], v[1]], v[2], { animate: false });
+  const p = session.get('homeowners.openHome');
+  const r = p && rowByParcel.get(p);
+  if (r) {
+    const i = rows.indexOf(r);
+    setTimeout(() => openHome(i), 400);   // popup at the home's location (dots may still be loading)
+  }
+}
 const noteTimers = {};
 document.addEventListener('input', e => {
   const ta = e.target.closest('.popup textarea'); if (!ta) return;
@@ -1149,6 +1162,7 @@ function countBy(col) { const c = new Map(); for (const r of rows) c.set(r[col],
     .filter(([z]) => z).map(([z, n]) => `<option value="${z}">${z} (${n.toLocaleString()})</option>`).join('');
   $('#loading').remove();
   search();
+  restoreSession();
 })();
 </script>
 </body>
