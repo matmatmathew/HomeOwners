@@ -11,12 +11,12 @@
 <style>
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #e3e6eb;
-    --accent: #1f6feb; --home: #1a7f4b; --row-hover: #eef4ff;
+    --accent: #1f6feb; --home: #1a7f4b; --noted: #7b3fe4; --row-hover: #eef4ff;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #12151b; --panel: #1a1e26; --text: #e6e9ef; --muted: #9aa3b2; --line: #2a303b;
-      --accent: #5b9bff; --home: #3fbf7f; --row-hover: #222a38; color-scheme: dark;
+      --accent: #5b9bff; --home: #3fbf7f; --noted: #a67bff; --row-hover: #222a38; color-scheme: dark;
     }
   }
   * { box-sizing: border-box; }
@@ -41,7 +41,7 @@
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   main { display: grid; grid-template-rows: 1fr 38vh; grid-template-columns: minmax(0, 1fr); min-width: 0; overflow: hidden; position: relative; }
-  #map { min-height: 0; min-width: 0; }
+  #map { min-height: 0; min-width: 0; position: relative; } /* keeps markers clipped to the map at every width */
   #loading { position: absolute; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center;
              background: var(--bg); color: var(--text); font-size: 15px; font-weight: 600; }
   #results { min-width: 0; border-top: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
@@ -60,6 +60,22 @@
   .popup table { font-size: 12px; white-space: normal; }
   .popup td, .popup th { padding: 2px 6px 2px 0; border: 0; position: static; background: none; cursor: default; }
   .popup .sales { max-height: 140px; overflow-y: auto; margin-top: 6px; border-top: 1px solid #ddd; }
+  .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid #fff;
+         box-shadow: 0 0 0 1px var(--line); vertical-align: -1px; }
+  .dot.home { background: #1a7f4b; } .dot.noted { background: #7b3fe4; }
+  .notes-box { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-top: 14px; background: var(--bg); }
+  .notes-box h2 { font-size: 14px; margin: 0 0 4px; }
+  .notes-box .legend { color: var(--muted); font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .notes-box .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .notes-box .msg { font-size: 12px; margin-top: 6px; min-height: 1em; color: var(--muted); }
+  .msg.err { color: #c62828; }
+  .popup .notes { margin-top: 8px; border-top: 1px solid #ddd; padding-top: 6px; }
+  .popup .notes label { font-weight: 600; font-size: 12px; display: block; margin-bottom: 3px; }
+  .popup textarea { width: 100%; min-height: 64px; resize: vertical; font: inherit; font-size: 13px; padding: 6px;
+                    border: 1px solid #c9cdd4; border-radius: 6px; background: #fff; color: #1d2330; }
+  .popup .note-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; font-size: 12px; color: #667085; }
+  .popup .note-row button { padding: 3px 8px; font-size: 12px; background: #fff; color: #1d2330; border-color: #c9cdd4; }
+  .pill.noted { background: #7b3fe4; }
   #mbar, .mobile-only { display: none; }
   .locate-btn { width: 34px; height: 34px; display: flex !important; align-items: center; justify-content: center;
                 background: #fff; color: #444; border-radius: 4px; cursor: pointer; }
@@ -97,6 +113,8 @@
     .c-city, .c-zip, .c-dor, .c-sub, .c-yearBuilt, .c-sqft, .c-beds,
     .c-baths, .c-lastSaleDate, .c-lastSaleAmt { display: none; }
     .leaflet-popup-content { margin: 10px 12px; }
+    .popup textarea { font-size: 16px; } /* stops iOS zoom-on-focus */
+    .popup .note-row button { padding: 7px 12px; }
     .locate-btn { width: 44px; height: 44px; }
     .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 40px; }
   }
@@ -108,6 +126,17 @@
   <div class="drawer-head"><h1>HomeOwners</h1><button class="mobile-only" id="closeFilters" aria-label="Close filters">✕</button></div>
   <div class="sub" id="summary">Seminole County, FL · loading…</div>
   <p class="about">Every home shown has a homestead exemption, which means the owner lives there as their permanent residence.</p>
+
+  <section class="notes-box" aria-labelledby="notesTitle">
+    <h2 id="notesTitle">My notes · <span id="noteCount">0</span></h2>
+    <div class="legend"><span><span class="dot home"></span> Owner-occupied home</span><span><span class="dot noted"></span> Has my notes</span></div>
+    <div class="btns">
+      <button id="backupNotes" type="button">Back up notes</button>
+      <button id="restoreNotes" type="button">Restore notes</button>
+      <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+    </div>
+    <div class="msg" id="notesMsg">Notes are saved in this browser on this device only. Back them up to keep them safe or move them to another device.</div>
+  </section>
 
   <label class="f" for="q">Owner, address or parcel</label>
   <input type="text" id="q" placeholder="e.g. SMITH or CRICKLEWOOD">
@@ -150,6 +179,7 @@
   </select>
 
   <div class="row"><input type="checkbox" id="pool"><label for="pool">Has pool</label></div>
+  <div class="row"><input type="checkbox" id="hasNotes"><label for="hasNotes">Only homes with my notes</label></div>
   <div class="row"><input type="checkbox" id="inview"><label for="inview">Only what's visible on the map</label></div>
 
   <p class="about" style="margin-top:14px">Source: Seminole County Property Appraiser, <span id="year">2026</span> tax roll. Sales history includes non-market transfers.</p>
@@ -196,6 +226,22 @@ const cityOf = r => D.cities[r[CITY]];
 const addressOf = r => `${r[STREET]}, ${title(cityOf(r))} FL ${r[ZIP]}`;
 const parcelFmt = p => [p.slice(0,2), p.slice(2,4), p.slice(4,6), p.slice(6,9), p.slice(9,13), p.slice(13,17)].join('-');
 
+// ---------- my notes: kept in this browser (localStorage), keyed by parcel number
+const NOTES_KEY = 'homeowners.notes.v1';
+let notes = {};            // { parcel: { text, updated } }
+let notesOk = true;
+try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}') || {}; }
+catch (e) { notesOk = false; notes = {}; }
+function persistNotes() {
+  try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); return true; }
+  catch (e) { notesMsg('This browser is not letting the site save notes (private browsing or storage turned off).', true); return false; }
+}
+const hasNote = p => !!(notes[p] && notes[p].text);
+function notesMsg(text, err) { const m = $('#notesMsg'); m.textContent = text; m.classList.toggle('err', !!err); }
+function updateNoteCount() { $('#noteCount').textContent = Object.keys(notes).length.toLocaleString(); }
+const DOT = { home: '#1a7f4b', noted: '#7b3fe4' };
+const dotStyle = p => ({ radius: 9, color: '#fff', weight: 2, fillColor: hasNote(p) ? DOT.noted : DOT.home, fillOpacity: 0.95 });
+
 const COLUMNS = [ // key, label, getter, numeric
   ['owner', 'Owner', r => r[OWNER]], ['address', 'Address', r => r[STREET]],
   ['city', 'City', r => title(cityOf(r))], ['zip', 'ZIP', r => r[ZIP]],
@@ -209,7 +255,8 @@ const COL = Object.fromEntries(COLUMNS.map(c => [c[0], c]));
 let sort = 'value', dir = 'desc';
 
 // ---------- map
-const map = L.map('map', { preferCanvas: true, zoomControl: false }).setView([28.70, -81.25], 11);
+// tolerance widens the clickable area around each dot by a few pixels
+const map = L.map('map', { renderer: L.canvas({ tolerance: 6 }), zoomControl: false }).setView([28.70, -81.25], 11);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
@@ -221,7 +268,7 @@ const markers = [];   // marker per row index, made on first use
 function markerFor(i) {
   if (!markers[i]) {
     const r = rows[i];
-    const m = L.circleMarker([r[LAT], r[LON]], { radius: 6, color: '#fff', weight: 1, fillColor: '#1a7f4b', fillOpacity: 0.9 });
+    const m = L.circleMarker([r[LAT], r[LON]], dotStyle(r[P]));
     m.on('click', () => openHome(i, m));
     markers[i] = m;
   }
@@ -237,13 +284,17 @@ async function salesFor(p) {
   return (await salesCache[b])[p] || [];
 }
 
-function popupHtml(r, sales) {
-  const rowsHtml = sales.length ? sales.map(([d, amt, deed, qual]) =>
+const salesHtml = sales => `<table><tr><th>Sold</th><th>Amount</th><th>Deed</th><th>Type of sale</th></tr>${
+  sales.length ? sales.map(([d, amt, deed, qual]) =>
     `<tr><td>${esc(d)}</td><td class="num">${fmt$(amt)}</td><td>${esc(title(deed))}</td><td>${esc(title(qual))}</td></tr>`).join('')
-    : '<tr><td>No sales on record</td></tr>';
+  : '<tr><td colspan="4">No sales on record</td></tr>'}</table>`;
+const savedWhen = p => notes[p] ? 'Saved ' + new Date(notes[p].updated).toLocaleString() : '';
+
+function popupHtml(i) {
+  const r = rows[i], n = notes[r[P]];
   return `<div class="popup">
     <h3>${esc(addressOf(r))}</h3>
-    <div><span class="pill">Owner lives here</span> ${esc(typeName(D.dors[r[DOR]]))}</div>
+    <div><span class="pill">Owner lives here</span>${n ? ' <span class="pill noted">My notes</span>' : ''} ${esc(typeName(D.dors[r[DOR]]))}</div>
     <table>
       <tr><th>Owner</th><td>${esc(r[OWNER])}</td></tr>
       <tr><th>Tax bill to</th><td>${r[MAIL] ? esc(r[MAIL]) : 'This home'}</td></tr>
@@ -252,18 +303,61 @@ function popupHtml(r, sales) {
       <tr><th>Home</th><td>Built ${esc(r[YB] ?? '?')} · ${fmtN(r[SQFT])} sq ft · ${r[BD] ?? '?'} bd / ${r[BA] ?? '?'} ba${r[POOL] ? ' · pool' : ''}</td></tr>
       <tr><th>Value</th><td>${fmt$(r[VALUE])} market value</td></tr>
     </table>
-    <div class="sales"><table><tr><th>Sold</th><th>Amount</th><th>Deed</th><th>Type of sale</th></tr>${rowsHtml}</table></div>
+    <div class="notes">
+      <label for="note-${i}">My notes</label>
+      <textarea id="note-${i}" data-i="${i}" placeholder="Type a note about this home. It saves automatically.">${esc(n ? n.text : '')}</textarea>
+      <div class="note-row"><button type="button" class="note-del" data-i="${i}"${n ? '' : ' hidden'}>Delete note</button><span class="note-status">${esc(savedWhen(r[P]))}</span></div>
+    </div>
+    <div class="sales">Loading sales…</div>
   </div>`;
 }
 
 async function openHome(i, marker) {
   const r = rows[i];
   const opts = { maxWidth: popupW(), autoPanPaddingTopLeft: [10, isMobile() ? 70 : 10] };
-  const popup = L.popup(opts).setContent(popupHtml(r, []).replace('No sales on record', 'Loading sales…'));
+  const popup = L.popup(opts).setContent(popupHtml(i));
   if (marker) marker.unbindPopup().bindPopup(popup).openPopup();
   else popup.setLatLng([r[LAT], r[LON]]).openOn(map);
-  popup.setContent(popupHtml(r, await salesFor(r[P])));
+  const sales = await salesFor(r[P]);
+  // fill in only the sales part, so a note being typed is not wiped out
+  const el = popup.getElement()?.querySelector('.sales');
+  if (el) el.innerHTML = salesHtml(sales);
 }
+
+// note editing inside popups: autosave shortly after typing stops
+function saveNote(i, text) {
+  const p = rows[i][P];
+  const had = hasNote(p);
+  text = text.trim();
+  if (text) notes[p] = { text, updated: new Date().toISOString() };
+  else delete notes[p];
+  persistNotes();
+  updateNoteCount();
+  if (markers[i]) markers[i].setStyle(dotStyle(p));
+  if (had !== hasNote(p) && $('#hasNotes').checked) debounced();
+  return hasNote(p);
+}
+const noteTimers = {};
+document.addEventListener('input', e => {
+  const ta = e.target.closest('.popup textarea'); if (!ta) return;
+  const i = Number(ta.dataset.i), box = ta.closest('.notes');
+  box.querySelector('.note-status').textContent = 'Saving…';
+  clearTimeout(noteTimers[i]);
+  noteTimers[i] = setTimeout(() => {
+    const kept = saveNote(i, ta.value);
+    box.querySelector('.note-status').textContent = kept ? savedWhen(rows[i][P]) : 'Note removed';
+    box.querySelector('.note-del').hidden = !kept;
+  }, 600);
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest('.popup .note-del'); if (!b) return;
+  const i = Number(b.dataset.i), box = b.closest('.notes');
+  clearTimeout(noteTimers[i]);
+  box.querySelector('textarea').value = '';
+  saveNote(i, '');
+  box.querySelector('.note-status').textContent = 'Note deleted';
+  b.hidden = true;
+});
 
 // ---------- "find me": blue dot at your location
 let meDot = null, meRing = null, watching = false;
@@ -315,7 +409,7 @@ function currentFilter() {
     vmin: numv('vmin'), vmax: numv('vmax'), ybmin: numv('ybmin'), ybmax: numv('ybmax'),
     bedmin: numv('bedmin'), bathmin: numv('bathmin'), samin: numv('samin'), samax: numv('samax'),
     spmin: numv('spmin'), spmax: numv('spmax'), lsmin: val('lsmin'), lsmax: val('lsmax'),
-    mail: val('mail'), pool: $('#pool').checked, bounds: $('#inview').checked ? map.getBounds() : null,
+    mail: val('mail'), pool: $('#pool').checked, noted: $('#hasNotes').checked, bounds: $('#inview').checked ? map.getBounds() : null,
   };
   return f;
 }
@@ -337,6 +431,7 @@ function matches(f) {
     if (f.mail === '1' && r[MAIL]) continue;
     if (f.mail === '0' && !r[MAIL]) continue;
     if (f.pool && !r[POOL]) continue;
+    if (f.noted && !hasNote(r[P])) continue;
     if (f.bounds && !f.bounds.contains([r[LAT], r[LON]])) continue;
     if (f.words.length && !f.words.every(w => hay[i].includes(w))) continue;
     out.push(i);
@@ -417,19 +512,66 @@ $('#reset').addEventListener('click', () => {
 $('#export').addEventListener('click', () => {
   const head = ['Parcel', 'Owner', 'Street', 'City', 'ZIP', 'Tax bill mailed to', 'Property type', 'Subdivision',
                 'Year built', 'Living sq ft', 'Bedrooms', 'Bathrooms', 'Pool', 'Market value', 'Last sale date',
-                'Last sale amount', 'Latitude', 'Longitude'];
+                'Last sale amount', 'Latitude', 'Longitude', 'My notes'];
   const q = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   const lines = [head.join(',')];
   for (const i of sortedTop(current)) {
     const r = rows[i];
     lines.push([parcelFmt(r[P]), r[OWNER], r[STREET], cityOf(r), r[ZIP], r[MAIL] || 'Same as home',
       D.dors[r[DOR]], D.subs[r[SUB]], r[YB], r[SQFT], r[BD], r[BA], r[POOL] ? 'Yes' : 'No', r[VALUE],
-      r[LSD], r[LSA], r[LAT], r[LON]].map(q).join(','));
+      r[LSD], r[LSA], r[LAT], r[LON], notes[r[P]]?.text || ''].map(q).join(','));
   }
-  const url = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' }));
-  const a = Object.assign(document.createElement('a'), { href: url, download: 'homeowners.csv' });
+  saveFile('homeowners.csv', '﻿' + lines.join('\r\n'), 'text/csv');
+});
+
+function saveFile(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
   document.body.append(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+// ---------- notes backup / restore (a .json file the user keeps)
+const rowByParcel = new Map();
+$('#backupNotes').addEventListener('click', () => {
+  const count = Object.keys(notes).length;
+  if (!count) { notesMsg('There are no notes to back up yet. Open a home on the map and type in "My notes".'); return; }
+  const out = {};
+  for (const [p, n] of Object.entries(notes)) {
+    const r = rowByParcel.get(p);
+    out[p] = { ...n, address: r ? addressOf(r) : '', owner: r ? r[OWNER] : '' };
+  }
+  const backup = { app: 'HomeOwners', kind: 'notes-backup', version: 1, exported: new Date().toISOString(), count, notes: out };
+  const day = new Date().toISOString().slice(0, 10);
+  saveFile(`homeowners-notes-${day}.json`, JSON.stringify(backup, null, 2), 'application/json');
+  notesMsg(`Backed up ${count.toLocaleString()} note${count === 1 ? '' : 's'} to homeowners-notes-${day}.json. Keep that file somewhere safe (email it to yourself or put it in OneDrive).`);
+});
+$('#restoreNotes').addEventListener('click', () => $('#restoreFile').click());
+$('#restoreFile').addEventListener('change', async e => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  let data;
+  try { data = JSON.parse(await file.text()); } catch { data = null; }
+  if (!data || data.kind !== 'notes-backup' || typeof data.notes !== 'object') {
+    notesMsg(`"${file.name}" is not a HomeOwners notes backup. Choose a file made with "Back up notes".`, true);
+    return;
+  }
+  // merge: add notes this device doesn't have; where both have one, keep the newer
+  let added = 0, updated = 0, kept = 0;
+  for (const [p, n] of Object.entries(data.notes)) {
+    if (!n || typeof n.text !== 'string' || !n.text.trim()) continue;
+    const incoming = { text: n.text, updated: n.updated || data.exported || new Date().toISOString() };
+    if (!notes[p]) { notes[p] = incoming; added++; }
+    else if (notes[p].text === incoming.text) kept++;
+    else if (incoming.updated > notes[p].updated) { notes[p] = incoming; updated++; }
+    else kept++;
+  }
+  if (!persistNotes()) return;
+  updateNoteCount();
+  markers.forEach((m, i) => m && m.setStyle(dotStyle(rows[i][P])));
+  map.closePopup();
+  search({ redraw: $('#hasNotes').checked });
+  notesMsg(`Restored from ${file.name}: ${added} new, ${updated} updated, ${kept} already up to date.`);
 });
 
 // ---------- mobile drawer / list sheet
@@ -458,6 +600,9 @@ function countBy(col) { const c = new Map(); for (const r of rows) c.set(r[col],
     return;
   }
   rows = D.rows;
+  rows.forEach(r => rowByParcel.set(r[P], r));
+  updateNoteCount();
+  if (!notesOk) notesMsg('This browser is not letting the site save notes (private browsing or storage turned off).', true);
   hay = rows.map(r => `${r[OWNER]} ${r[STREET]} ${D.cities[r[CITY]]} ${r[P]} ${parcelFmt(r[P])}`.toUpperCase());
   $('#year').textContent = D.dataYear;
   $('#summary').textContent = `${D.county} · ${rows.length.toLocaleString()} owner-occupied homes`;
