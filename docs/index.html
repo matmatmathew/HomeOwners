@@ -111,7 +111,29 @@
   .popup .clip-del { padding: 2px 8px; font-size: 11px; background: #fff; color: #1d2330; border-color: #cdb8f6; }
   .popup .clip-meta { color: #5f5678; }
   .popup .photos { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #cdb8f6; }
-  .popup .photo-btn { padding: 4px 10px; font-size: 12px; background: #fff; color: #5a2bb3; border-color: #cdb8f6; font-weight: 600; }
+  .popup .photo-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+  .popup .photo-btn, .popup .photo-take { padding: 6px 8px; font-size: 12px; background: #fff; color: #5a2bb3; border: 1.5px solid #cdb8f6; font-weight: 600; }
+  .popup .photo-take { background: #7b3fe4; color: #fff; border-color: #7b3fe4; }
+  .popup .popup-backup { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding-top: 8px;
+                         border-top: 1px dashed #cdb8f6; font-size: 12px; font-weight: 600; color: #3d2a66; }
+  .popup .popup-backup span { flex: 1; min-width: 80px; }
+  .popup .popup-backup button { padding: 5px 10px; font-size: 12px; font-weight: 600; background: #fff; color: #5a2bb3; border: 1.5px solid #7b3fe4; }
+  .popup .popup-backup .pb-backup { background: #7b3fe4; color: #fff; }
+  #toast { position: fixed; left: 16px; right: 16px; margin: 0 auto; width: fit-content; bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 4000;
+           max-width: 520px; background: #2b1d4a; color: #fff; padding: 12px 16px; border-radius: 10px;
+           box-shadow: 0 4px 18px rgba(0,0,0,.3); font-size: 14px; line-height: 1.4; }
+  #toast[hidden] { display: none; }
+  #toast.err { background: #8e1c1c; }
+  #camera { position: fixed; inset: 0; z-index: 3000; background: rgba(10, 8, 20, .95); display: flex; flex-direction: column;
+            padding: calc(10px + env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+  #camera[hidden] { display: none; }
+  #camera video { max-width: 100%; max-height: 100%; border-radius: 4px; background: #000; }
+  #camera .vimg { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  #camera .vbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; color: #e9e4f7; font-size: 13px; }
+  #camera .vbar span { flex: 1; min-width: 0; }
+  #camera button { padding: 10px 16px; font-weight: 600; }
+  #camCancel { background: #fff; color: #1d2330; border-color: #fff; }
+  #camSnap { background: #7b3fe4; color: #fff; border-color: #7b3fe4; }
   .popup .photo-msg { font-size: 12px; color: #667085; margin-top: 2px; }
   .popup .photo-msg.err { color: #c62828; }
   .popup .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; margin-top: 6px; }
@@ -168,7 +190,8 @@
     .c-baths, .c-lastSaleDate, .c-lastSaleAmt { display: none; }
     .leaflet-popup-content { margin: 10px 12px; max-height: calc(100vh - 200px); max-height: calc(100dvh - 200px); }
     .popup textarea { font-size: 16px; } /* stops iOS zoom-on-focus */
-    .popup .note-row button, .popup .rec-btn, .popup .clip-del, .popup .photo-btn { padding: 8px 12px; font-size: 13px; }
+    .popup .note-row button, .popup .rec-btn, .popup .clip-del, .popup .photo-btn, .popup .photo-take,
+    .popup .popup-backup button { padding: 9px 12px; font-size: 13px; }
     .popup .voice-list { max-height: 140px; }
     .locate-btn { width: 44px; height: 44px; }
     .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 40px; }
@@ -267,6 +290,13 @@
   </section>
 </main>
 
+<div id="camera" role="dialog" aria-modal="true" aria-label="Take a photo" hidden>
+  <div class="vimg"><video id="camVideo" autoplay playsinline muted></video></div>
+  <div class="vbar"><span>Point the camera and tap Take photo.</span><button type="button" id="camCancel">Cancel</button><button type="button" id="camSnap">📷 Take photo</button></div>
+</div>
+
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
 <div id="viewer" role="dialog" aria-modal="true" aria-label="Photo" hidden>
   <div class="vimg"><img id="viewerImg" alt="Photo note"></div>
   <div class="vbar"><span id="viewerWhen"></span><button type="button" id="viewerDelete">Delete photo</button><button type="button" id="viewerClose">Close</button></div>
@@ -305,7 +335,17 @@ function persistNotes() {
 }
 // a home "has notes" if it has a text note or at least one voice note
 const hasNote = p => !!(notes[p] && notes[p].text) || (voiceCounts.get(p) || 0) > 0 || (photoCounts.get(p) || 0) > 0;
-function notesMsg(text, err) { const m = $('#notesMsg'); m.textContent = text; m.classList.toggle('err', !!err); }
+function notesMsg(text, err) {
+  const m = $('#notesMsg'); m.textContent = text; m.classList.toggle('err', !!err);
+  toast(text, err);   // also show it on screen, since the side panel is hidden on phones
+}
+let toastTimer;
+function toast(text, err) {
+  const t = $('#toast'); if (!t) return;
+  t.textContent = text; t.classList.toggle('err', !!err); t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, Math.min(12000, 3000 + text.length * 45));
+}
 function updateNoteCount() {
   const homes = new Set(Object.keys(notes));
   voiceCounts.forEach((n, p) => { if (n > 0) homes.add(p); });
@@ -467,10 +507,20 @@ function popupHtml(i) {
         <div class="voice-list"></div>
       </div>
       <div class="photos" data-i="${i}">
-        <div class="voice-head"><span class="vlabel">Photos</span><button type="button" class="photo-btn" data-i="${i}">📷 Add photo</button></div>
+        <div class="vlabel">Photos</div>
+        <div class="photo-btns">
+          <button type="button" class="photo-take" data-i="${i}">📷 Take photo</button>
+          <button type="button" class="photo-btn" data-i="${i}">🖼 Choose photo</button>
+        </div>
         <input type="file" class="photo-input" data-i="${i}" accept="image/*" multiple hidden>
+        <input type="file" class="photo-input photo-cam" data-i="${i}" accept="image/*" capture="environment" hidden>
         <div class="photo-msg" role="status"></div>
         <div class="photo-grid"></div>
+      </div>
+      <div class="popup-backup">
+        <span>All my notes:</span>
+        <button type="button" class="pb-backup">⬇ Back up</button>
+        <button type="button" class="pb-restore">⬆ Restore</button>
       </div>
     </div>
     <div class="sales">Loading sales…</div>
@@ -671,15 +721,29 @@ async function renderPhotos(i) {
   }).join('');
   refit(popup);
 }
+// phones and tablets open their own camera app; computers use the webcam window below
+const isTouchDevice = () => matchMedia('(pointer: coarse)').matches;
 document.addEventListener('click', e => {
   const btn = e.target.closest('.popup .photo-btn');
-  if (btn) { photoBox(Number(btn.dataset.i))?.querySelector('.photo-input').click(); return; }
+  if (btn) { photoBox(Number(btn.dataset.i))?.querySelector('.photo-input:not(.photo-cam)').click(); return; }
+  const take = e.target.closest('.popup .photo-take');
+  if (take) {
+    const i = Number(take.dataset.i);
+    if (isTouchDevice() || !navigator.mediaDevices?.getUserMedia) photoBox(i)?.querySelector('.photo-cam').click();
+    else openCamera(i);
+    return;
+  }
   const th = e.target.closest('.popup .thumb');
-  if (th) openViewer(Number(th.dataset.i), Number(th.dataset.id), th.dataset.url, th.dataset.when);
+  if (th) { openViewer(Number(th.dataset.i), Number(th.dataset.id), th.dataset.url, th.dataset.when); return; }
+  if (e.target.closest('.popup .pb-backup')) { $('#backupNotes').click(); return; }
+  if (e.target.closest('.popup .pb-restore')) $('#restoreFile').click();
 });
-document.addEventListener('change', async e => {
+document.addEventListener('change', e => {
   const input = e.target.closest('.popup .photo-input'); if (!input) return;
   const i = Number(input.dataset.i), files = [...input.files]; input.value = '';
+  savePhotos(i, files);
+});
+async function savePhotos(i, files) {
   if (!files.length) return;
   const p = rows[i][P], had = hasNote(p);
   photoMsg(i, files.length > 1 ? `Saving ${files.length} photos…` : 'Saving photo…');
@@ -697,7 +761,40 @@ document.addEventListener('change', async e => {
     photoMsg(i, saved === 1 ? 'Photo saved.' : `${saved} photos saved.`);
     renderPhotos(i);
   }
+}
+
+// webcam window for "Take photo" on a computer
+let cam = null;   // { i, stream }
+async function openCamera(i) {
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } }, audio: false }); }
+  catch (e) {
+    if (e.name === 'NotAllowedError') { photoMsg(i, 'Camera access is blocked. Allow the camera for this site in your browser settings, then try again.', true); return; }
+    photoBox(i)?.querySelector('.photo-cam').click();   // no webcam: fall back to the file picker
+    return;
+  }
+  cam = { i, stream };
+  const v = $('#camVideo'); v.srcObject = stream;
+  $('#camera').hidden = false;
+  try { await v.play(); } catch (e) {}
+  $('#camSnap').focus();
+}
+function closeCamera() {
+  if (cam) cam.stream.getTracks().forEach(t => t.stop());
+  cam = null; $('#camVideo').srcObject = null; $('#camera').hidden = true;
+}
+$('#camCancel').addEventListener('click', closeCamera);
+$('#camSnap').addEventListener('click', async () => {
+  if (!cam) return;
+  const v = $('#camVideo'), i = cam.i;
+  if (!v.videoWidth) return;
+  const c = Object.assign(document.createElement('canvas'), { width: v.videoWidth, height: v.videoHeight });
+  c.getContext('2d').drawImage(v, 0, 0);
+  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+  closeCamera();
+  if (blob) savePhotos(i, [new File([blob], 'camera.jpg', { type: 'image/jpeg' })]);
 });
+addEventListener('keydown', e => { if (e.key === 'Escape' && cam) closeCamera(); });
 
 // full-size photo viewer
 let viewing = null;   // { i, id }
