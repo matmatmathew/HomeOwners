@@ -151,7 +151,22 @@
   .locate-btn { width: 34px; height: 34px; display: flex !important; align-items: center; justify-content: center;
                 background: #fff; color: #444; border-radius: 4px; cursor: pointer; }
   .locate-btn[data-state="busy"] { color: #999; }
-  .locate-btn[data-state="on"] { color: #1f6feb; }
+  .locate-btn[data-state="free"] { color: #1f6feb; }
+  .locate-btn[data-state="follow"] { background: #1f6feb; color: #fff; }
+  /* you-are-here marker: blue dot, arrow and soft beam pointing the way you face */
+  .me-icon { background: none; border: 0; }
+  .me { position: relative; width: 44px; height: 44px; pointer-events: none; }
+  .me-dot { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%;
+            background: #1f6feb; border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.25), 0 1px 5px rgba(0,0,0,.45); }
+  .me-arrow { position: absolute; inset: 0; transition: transform .25s linear; }
+  .me-beam { position: absolute; inset: -18px; border-radius: 50%;
+             background: conic-gradient(from -30deg, rgba(31,111,235,.38) 0deg 60deg, transparent 60deg 360deg);
+             -webkit-mask: radial-gradient(circle, #000 25%, transparent 72%); mask: radial-gradient(circle, #000 25%, transparent 72%); }
+  .me-tip { position: absolute; left: 50%; top: -1px; margin-left: -8px; width: 0; height: 0;
+            border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 12px solid #1f6feb;
+            filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); }
+  .me.no-heading .me-arrow { display: none; }
+  @media (prefers-reduced-motion: reduce) { .me-arrow { transition: none; } }
 
   /* ---------- phones & small tablets: full-screen map, filters drawer, list sheet */
   @media (max-width: 800px) {
@@ -862,40 +877,114 @@ document.addEventListener('click', e => {
   b.hidden = true;
 });
 
-// ---------- "find me": blue dot at your location
-let meDot = null, meRing = null, watching = false;
+// ---------- live location: blue dot with a direction arrow; the map follows you as you walk
+// Button states: off -> "follow" (map keeps you centered) -> tap again = off.
+// Dragging the map or opening a home pauses following ("free"); tapping the button re-centers.
+let meMarker = null, meRing = null, watchId = null, following = false, lastFix = null, wakeLock = null;
+let compassHeading = null, compassAt = 0, gpsHeading = null, shownRotation = 0;
 const LocateControl = L.Control.extend({
   options: { position: 'bottomright' },
   onAdd() {
     const b = L.DomUtil.create('a', 'leaflet-bar locate-btn');
-    b.href = '#'; b.title = 'Show my location'; b.setAttribute('role', 'button'); b.setAttribute('aria-label', 'Show my location');
+    b.href = '#'; b.title = 'Show and follow my location'; b.setAttribute('role', 'button'); b.setAttribute('aria-label', 'Show and follow my location');
     b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="currentColor" stroke-width="2"/></svg>';
     L.DomEvent.disableClickPropagation(b);
-    L.DomEvent.on(b, 'click', e => { L.DomEvent.preventDefault(e); toggleLocate(); });
+    L.DomEvent.on(b, 'click', e => { L.DomEvent.preventDefault(e); onLocateTap(); });
     return b;
   }
 });
 const locateCtl = new LocateControl().addTo(map);
-const setLocBtn = state => { locateCtl.getContainer().dataset.state = state; };
-function toggleLocate() {
-  if (watching) { map.stopLocate(); watching = false; setLocBtn(''); return; }
-  if (!window.isSecureContext || !navigator.geolocation) { alert('Location needs a secure (https) connection.'); return; }
-  watching = true; setLocBtn('busy');
-  map.locate({ watch: true, setView: false, enableHighAccuracy: true, maximumAge: 10000 });
-  map.once('locationfound', e => map.setView(e.latlng, Math.max(map.getZoom(), 17)));
+function setLocBtn(state) {
+  const b = locateCtl.getContainer(); b.dataset.state = state;
+  b.title = state === 'follow' ? 'Following you. Tap to stop.' : state === 'free' ? 'Tap to center on you' : 'Show and follow my location';
 }
-map.on('locationfound', e => {
-  setLocBtn('on');
-  if (!meDot) {
-    meRing = L.circle(e.latlng, { radius: e.accuracy, color: '#1f6feb', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(map);
-    meDot = L.circleMarker(e.latlng, { radius: 8, color: '#fff', weight: 3, fillColor: '#1f6feb', fillOpacity: 1 }).addTo(map).bindTooltip('You are here');
-  } else { meDot.setLatLng(e.latlng); meRing.setLatLng(e.latlng).setRadius(e.accuracy); }
-});
-map.on('locationerror', e => {
-  watching = false; setLocBtn('');
-  alert(e.code === 1 ? 'Location permission was denied. Allow location for this site in your browser settings and try again.'
-                     : 'Could not get your location: ' + e.message);
-});
+
+function onLocateTap() {
+  if (watchId !== null) {
+    if (!following && lastFix) { setFollow(true); map.setView(lastFix, Math.max(map.getZoom(), 17)); return; }   // re-center
+    stopTracking(); return;
+  }
+  if (!window.isSecureContext || !navigator.geolocation) { toast('Location needs a secure (https) connection.', true); return; }
+  startCompass();          // must run inside the tap: iPhones only allow the compass after a tap
+  setLocBtn('busy'); following = true;
+  watchId = navigator.geolocation.watchPosition(onFix, onFixError, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+  keepAwake(true);
+}
+function stopTracking() {
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = null; following = false; lastFix = null;
+  if (meMarker) { meMarker.remove(); meRing.remove(); meMarker = meRing = null; }
+  stopCompass(); keepAwake(false); setLocBtn('');
+}
+function setFollow(on) { following = on; if (watchId !== null && lastFix) setLocBtn(on ? 'follow' : 'free'); }
+map.on('dragstart', () => { if (following) setFollow(false); });
+map.on('popupopen', () => { if (following) setFollow(false); });   // don't pull the map away from a home you opened
+
+function onFix(pos) {
+  const { latitude, longitude, accuracy, heading, speed } = pos.coords;
+  const ll = L.latLng(latitude, longitude), first = !lastFix;
+  lastFix = ll;
+  gpsHeading = (heading != null && !isNaN(heading) && (speed == null || speed > 0.6)) ? heading : gpsHeading;
+  if (!meMarker) {
+    meRing = L.circle(ll, { radius: accuracy, color: '#1f6feb', weight: 1, fillOpacity: 0.1, interactive: false }).addTo(map);
+    meMarker = L.marker(ll, {
+      icon: L.divIcon({ className: 'me-icon', iconSize: [44, 44], iconAnchor: [22, 22],
+        html: '<div class="me no-heading"><div class="me-arrow"><div class="me-beam"></div><div class="me-tip"></div></div><div class="me-dot"></div></div>' }),
+      keyboard: false, interactive: false, zIndexOffset: 1000,
+    }).addTo(map);
+  } else { meMarker.setLatLng(ll); meRing.setLatLng(ll).setRadius(accuracy); }
+  drawHeading();
+  if (first) { map.setView(ll, Math.max(map.getZoom(), 17)); setLocBtn('follow'); }
+  else if (following) map.panTo(ll, { animate: true, duration: 0.6 });
+}
+function onFixError(e) {
+  if (e.code === 1) { stopTracking(); toast('Location permission is off. Allow location for this site in your browser settings and try again.', true); }
+  else if (!lastFix) toast('Still looking for your location… Being outdoors helps.');
+}
+
+// direction: the phone's compass when available, otherwise the GPS direction of travel
+const norm360 = a => ((a % 360) + 360) % 360;
+function onOrientation(e) {
+  let h = null;
+  if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;          // iPhone
+  else if (e.absolute && typeof e.alpha === 'number') h = 360 - e.alpha;                // Android
+  if (h == null) return;
+  h = norm360(h + (screen.orientation?.angle ?? window.orientation ?? 0));             // account for a sideways phone
+  if (compassHeading == null) compassHeading = h;
+  else { const d = ((h - compassHeading + 540) % 360) - 180; compassHeading = norm360(compassHeading + d * 0.3); }  // smooth jitter
+  compassAt = Date.now();
+  drawHeading();
+}
+const orientEvent = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+function startCompass() {
+  const DOE = window.DeviceOrientationEvent;
+  if (!DOE) return;
+  // iPhones (and some newer Android browsers) ask permission first. Listen whatever the answer:
+  // if the compass is blocked, no readings arrive and the arrow falls back to the GPS direction.
+  const listen = () => { removeEventListener(orientEvent, onOrientation); addEventListener(orientEvent, onOrientation); };
+  if (typeof DOE.requestPermission === 'function') DOE.requestPermission().then(listen, listen);
+  else listen();
+}
+function stopCompass() { removeEventListener(orientEvent, onOrientation); compassHeading = null; gpsHeading = null; }
+function currentHeading() { return compassHeading != null && Date.now() - compassAt < 3000 ? compassHeading : gpsHeading; }
+function drawHeading() {
+  const el = meMarker?.getElement()?.querySelector('.me'); if (!el) return;
+  const h = currentHeading();
+  el.classList.toggle('no-heading', h == null);
+  if (h == null) return;
+  const d = ((h - norm360(shownRotation) + 540) % 360) - 180;   // turn the short way round (359° -> 1° is +2°, not -358°)
+  shownRotation += d;
+  el.querySelector('.me-arrow').style.transform = `rotate(${shownRotation}deg)`;
+}
+
+// keep the screen on while tracking (where the browser allows it)
+async function keepAwake(on) {
+  try {
+    if (on && 'wakeLock' in navigator && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen');
+    else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch (e) { wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => { if (watchId !== null && document.visibilityState === 'visible') keepAwake(true); });
 
 // ---------- filtering (all in the browser)
 const val = id => $('#' + id).value.trim();
