@@ -80,6 +80,8 @@
   .notes-box .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .notes-box .btns button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; padding: 9px 10px; }
   .btn-noted { background: var(--noted); border-color: var(--noted); color: #fff; }
+  .notes-box .btns .wide { grid-column: 1 / -1; padding: 11px 10px; font-size: 14px; }
+  .restore-hint { font-size: 11.5px; color: var(--muted); margin-top: -3px; }
   .btn-noted-outline { background: var(--panel); border: 1.5px solid var(--noted); color: var(--noted-ink); }
   .notes-box .msg { font-size: 12px; color: var(--muted); }
   .msg.err { color: #c62828; }
@@ -226,12 +228,15 @@
     <div class="legend"><span><span class="dot home"></span> Owner-occupied home</span><span><span class="dot noted"></span> Has my notes</span></div>
     <div class="backup-status" id="backupStatus" role="status">Nothing to back up yet.</div>
     <div class="btns">
-      <button id="backupNotes" type="button" class="btn-noted">
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Back up</button>
+      <button id="cloudBackup" type="button" class="btn-noted wide">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 9.2 4.5 4.5 0 0 0 7 18z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 15V10M9.5 12.5 12 10l2.5 2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Save to Drive / OneDrive</button>
+      <button id="backupNotes" type="button" class="btn-noted-outline">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Download</button>
       <button id="restoreNotes" type="button" class="btn-noted-outline">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Restore</button>
-      <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+      <input type="file" id="restoreFile" accept=".json,.txt,application/json,text/plain" hidden>
     </div>
+    <div class="restore-hint">To restore from the cloud, tap Restore and pick the backup file from Drive or OneDrive.</div>
     <div class="msg" id="notesMsg">Text, voice and photo notes are saved on this device only. Back up to keep them safe or to move them to another device.</div>
   </section>
 
@@ -1135,13 +1140,11 @@ const homeInfo = p => { const r = rowByParcel.get(p); return { address: r ? addr
 
 const getAllMedia = async name => { try { return await vstore('readonly', s => s.getAll(), name) || []; } catch (e) { return []; } };
 
-$('#backupNotes').addEventListener('click', async () => {
+// gathers every note into one backup file's contents (null when there's nothing to back up)
+async function buildBackup() {
   const clips = await getAllMedia('voice'), pics = await getAllMedia('photos');
   const textCount = Object.keys(notes).length;
-  if (!textCount && !clips.length && !pics.length) {
-    notesMsg('There are no notes to back up yet. Open a home on the map and add a text, voice or photo note.'); return;
-  }
-  notesMsg('Preparing backup…');
+  if (!textCount && !clips.length && !pics.length) return null;
   const out = {};
   for (const [p, n] of Object.entries(notes)) out[p] = { ...n, ...homeInfo(p) };
   const voice = [], photos = [];
@@ -1151,14 +1154,85 @@ $('#backupNotes').addEventListener('click', async () => {
     photos.push({ parcel: ph.parcel, ...homeInfo(ph.parcel), created: ph.created, type: ph.type, image: await blobToDataUrl(ph.blob) });
   const backup = { app: 'HomeOwners', kind: 'notes-backup', version: 3, exported: new Date().toISOString(),
                    textNotes: textCount, voiceNotes: voice.length, photoNotes: photos.length, notes: out, voice, photos };
-  const day = new Date().toISOString().slice(0, 10);
   const json = JSON.stringify(backup);
-  saveFile(`homeowners-notes-${day}.json`, json, 'application/json');
-  stamp.set('homeowners.lastBackup', new Date().toISOString());
-  updateNoteCount();
+  const day = new Date().toISOString().slice(0, 10);
   const mb = json.length / 1e6;
-  notesMsg(`Backed up ${plural(textCount, 'text note')}, ${plural(voice.length, 'voice note')} and ${plural(photos.length, 'photo')} ` +
-           `to homeowners-notes-${day}.json${mb >= 1 ? ` (${mb.toFixed(1)} MB)` : ''}. Keep that file somewhere safe (email it to yourself or put it in OneDrive).`);
+  return { json, name: `homeowners-notes-${day}.json`, day,
+           summary: `${plural(textCount, 'text note')}, ${plural(voice.length, 'voice note')} and ${plural(photos.length, 'photo')}` +
+                    (mb >= 1 ? ` (${mb.toFixed(1)} MB)` : '') };
+}
+const NOTHING_YET = 'There are no notes to back up yet. Open a home on the map and add a text, voice or photo note.';
+function backedUp() { stamp.set('homeowners.lastBackup', new Date().toISOString()); updateNoteCount(); }
+
+$('#backupNotes').addEventListener('click', async () => {
+  notesMsg('Preparing backup…');
+  const b = await buildBackup();
+  if (!b) { notesMsg(NOTHING_YET); return; }
+  saveFile(b.name, b.json, 'application/json');
+  backedUp();
+  notesMsg(`Backed up ${b.summary} to ${b.name} in your Downloads. Keep it somewhere safe, or use "Save to Drive / OneDrive".`);
+});
+
+// ---------- "Save to Drive / OneDrive"
+// Phones: the share menu, where Google Drive and OneDrive appear if their apps are installed.
+// Computers: a Save dialog that remembers the folder, so you can pick your OneDrive or Google Drive folder.
+let preparedShare = null;   // a backup built on an earlier tap, waiting for a fresh tap to share it
+function shareableFile(b) {
+  // some browsers only share certain file types; JSON isn't always one of them, plain text is
+  const asJson = new File([b.json], b.name, { type: 'application/json' });
+  if (navigator.canShare?.({ files: [asJson] })) return asJson;
+  const asText = new File([b.json], b.name.replace(/\.json$/, '.backup.txt'), { type: 'text/plain' });
+  return navigator.canShare?.({ files: [asText] }) ? asText : null;
+}
+$('#cloudBackup').addEventListener('click', async () => {
+  const phoneShare = !!navigator.canShare && matchMedia('(pointer: coarse)').matches;
+  // computer with a real Save dialog: open it first (it must open straight from the tap)
+  if (!phoneShare && window.showSaveFilePicker) {
+    const day = new Date().toISOString().slice(0, 10);
+    let handle;
+    try {
+      handle = await showSaveFilePicker({ id: 'homeowners-backup', startIn: 'documents', suggestedName: `homeowners-notes-${day}.json`,
+                                          types: [{ description: 'HomeOwners notes backup', accept: { 'application/json': ['.json'] } }] });
+    } catch (e) { if (e.name !== 'AbortError') notesMsg('Could not open the Save dialog: ' + e.message, true); return; }
+    notesMsg('Preparing backup…');
+    const b = await buildBackup();
+    if (!b) { notesMsg(NOTHING_YET); return; }
+    try { const w = await handle.createWritable(); await w.write(b.json); await w.close(); }
+    catch (e) { notesMsg('Could not save the backup: ' + e.message, true); return; }
+    backedUp();
+    notesMsg(`Saved ${b.summary} as ${handle.name}. If you chose your OneDrive or Google Drive folder, it will sync to the cloud. Next time the dialog opens in the same folder.`);
+    return;
+  }
+  // phone (or a computer browser with sharing): the share menu
+  if (navigator.canShare) {
+    let file = preparedShare && Date.now() - preparedShare.at < 120000 ? preparedShare.file : null;
+    let summary = preparedShare?.summary;
+    if (!file) {
+      notesMsg('Preparing backup…');
+      const b = await buildBackup();
+      if (!b) { notesMsg(NOTHING_YET); return; }
+      file = shareableFile(b); summary = b.summary;
+      if (!file) { saveFile(b.name, b.json, 'application/json'); backedUp(); notesMsg(`This browser can't send files to other apps, so the backup was saved to Downloads as ${b.name}.`); return; }
+    }
+    try {
+      await navigator.share({ files: [file], title: 'HomeOwners notes backup', text: 'HomeOwners notes backup' });
+      preparedShare = null; backedUp();
+      notesMsg(`Sent ${summary}. Make sure you chose Drive or OneDrive in the share menu.`);
+    } catch (e) {
+      if (e.name === 'AbortError') { preparedShare = null; notesMsg('Backup not sent. Nothing was changed.'); }
+      else if (e.name === 'NotAllowedError') {
+        // building a big backup took too long for the browser to treat the share as part of your tap
+        preparedShare = { file, summary, at: Date.now() };
+        notesMsg('Your backup is ready. Tap "Save to Drive / OneDrive" once more to choose where to send it.');
+      } else notesMsg('Could not share the backup: ' + e.message, true);
+    }
+    return;
+  }
+  // no sharing and no Save dialog: plain download
+  const b = await buildBackup();
+  if (!b) { notesMsg(NOTHING_YET); return; }
+  saveFile(b.name, b.json, 'application/json'); backedUp();
+  notesMsg(`Saved ${b.summary} to Downloads as ${b.name}. Move it into your OneDrive or Google Drive folder to keep it in the cloud.`);
 });
 
 // add backed-up voice clips or photos this device doesn't already have (same home + same time = same item)
@@ -1185,7 +1259,7 @@ $('#restoreFile').addEventListener('change', async e => {
   let data;
   try { data = JSON.parse(await file.text()); } catch { data = null; }
   if (!data || data.kind !== 'notes-backup' || typeof data.notes !== 'object') {
-    notesMsg(`"${file.name}" is not a HomeOwners notes backup. Choose a file made with "Back up notes".`, true);
+    notesMsg(`"${file.name}" is not a HomeOwners notes backup. Choose a file made with "Save to Drive / OneDrive" or "Download".`, true);
     return;
   }
   // merge: add notes this device doesn't have; where both have one, keep the newer
