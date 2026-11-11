@@ -1,19 +1,26 @@
 """Export homeowners.db into the static website in docs/ (served by GitHub Pages).
 
-Usage:
-    python build_db.py      # CSVs -> homeowners.db
-    python build_site.py    # homeowners.db -> docs/data/*.json
+Usage (normally run for you by update_data.py):
+    python build_site.py                         # homeowners.db -> docs/data/*.json
+    python build_site.py --db other.db --year 2027 --as-of 2027-01-15
+
+--as-of  date of the county's export (shown on the site as "Data as of ...").
+         Default: read from SeminoleCounty/_source.json (written by update_data.py),
+         otherwise the date of SeminoleCounty/Parcels.csv.
+--year   tax-roll year shown on the site. Default: the year of --as-of.
 
 Only homesteaded (owner-occupied) parcels are published.
 """
+import argparse
 import json
 import os
 import shutil
 import sqlite3
-from datetime import date
+from datetime import date, datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(HERE, "homeowners.db")
+DATA_DIR = os.path.join(HERE, "SeminoleCounty")
 OUT = os.path.join(HERE, "docs", "data")
 SALES_BUCKETS = 64
 
@@ -26,8 +33,28 @@ def bucket(parcel):
     return h % SALES_BUCKETS
 
 
+def data_date():
+    """Date of the county export: from _source.json, else from Parcels.csv's file date."""
+    try:
+        with open(os.path.join(DATA_DIR, "_source.json"), encoding="utf-8") as f:
+            return json.load(f)["asOf"]
+    except (OSError, ValueError, KeyError):
+        pass
+    try:
+        return datetime.fromtimestamp(os.path.getmtime(os.path.join(DATA_DIR, "Parcels.csv"))).date().isoformat()
+    except OSError:
+        return date.today().isoformat()
+
+
 def main():
-    db = sqlite3.connect(DB_PATH)
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--db", default=DB_PATH)
+    ap.add_argument("--year", type=int)
+    ap.add_argument("--as-of", dest="as_of")
+    a = ap.parse_args()
+    as_of = a.as_of or data_date()
+    year = a.year or int(as_of[:4])
+    db = sqlite3.connect(a.db)
     rows = db.execute("""
         SELECT parcel, owner, street, city, zip, dor_code, subdivision,
                year_built, living_area, bedrooms, bathrooms, pool,
@@ -59,7 +86,8 @@ def main():
 
     homes = {
         "county": "Seminole County, FL",
-        "dataYear": 2026,
+        "dataYear": year,
+        "dataAsOf": as_of,
         "built": date.today().isoformat(),
         "cols": ["parcel", "owner", "street", "city", "zip", "dor", "sub",
                  "yearBuilt", "sqft", "beds", "baths", "pool", "value",
@@ -84,6 +112,7 @@ def main():
             json.dump(b, f, separators=(",", ":"), ensure_ascii=False)
 
     size = os.path.getsize(os.path.join(OUT, "homes.json")) / 1e6
+    print(f"data as of {as_of} ({year} tax roll)")
     print(f"homes.json: {len(out_rows):,} homes, {size:.1f} MB; sales: {n:,} records in {SALES_BUCKETS} files")
 
 

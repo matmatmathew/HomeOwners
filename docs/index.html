@@ -336,7 +336,7 @@
   <div class="row"><input type="checkbox" id="hasNotes"><label for="hasNotes">Only homes with my notes</label></div>
   <div class="row"><input type="checkbox" id="inview"><label for="inview">Only what's visible on the map</label></div>
 
-  <p class="about" style="margin-top:14px">Source: Seminole County Property Appraiser, <span id="year">2026</span> tax roll. Sales history includes non-market transfers.</p>
+  <p class="about" style="margin-top:14px">Source: Seminole County Property Appraiser, <span id="year">2026</span> tax roll. <span id="asOf"></span> Sales history includes non-market transfers.</p>
 
   <div class="buttons">
     <button class="primary mobile-only" id="showResults">Show results</button>
@@ -1807,7 +1807,9 @@ function countBy(col) { const c = new Map(); for (const r of rows) c.set(r[col],
   if (!notesOk) notesMsg('This browser is not letting the site save notes (private browsing or storage turned off).', true);
   hay = rows.map(r => `${r[OWNER]} ${r[STREET]} ${D.cities[r[CITY]]} ${r[P]} ${parcelFmt(r[P])}`.toUpperCase());
   $('#year').textContent = D.dataYear;
-  $('#summary').textContent = `${D.county} · ${rows.length.toLocaleString()} owner-occupied homes`;
+  const asOf = D.dataAsOf ? new Date(D.dataAsOf + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  $('#asOf').textContent = asOf ? `Data as of ${asOf}.` : '';
+  $('#summary').textContent = `${D.county} · ${rows.length.toLocaleString()} owner-occupied homes` + (asOf ? ` · data as of ${asOf}` : '');
   checkList($('#city'), countBy(CITY).filter(([i]) => D.cities[i]).map(([i, n]) => [i, title(D.cities[i]), n]));
   checkList($('#dor'), countBy(DOR).map(([i, n]) => [i, typeName(D.dors[i]), n]));
   $('#zip').innerHTML = countBy(ZIP).sort((a, b) => a[0].localeCompare(b[0]))

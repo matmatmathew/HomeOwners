@@ -4,3 +4,7 @@ SeminoleCounty/
 __pycache__/
 android-app/node_modules/
 android-app/.build-certs/
+homeowners.db.new
+SeminoleCounty.new/
+SeminoleCounty.old/
+*.zip

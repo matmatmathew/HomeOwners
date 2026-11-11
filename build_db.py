@@ -1,10 +1,11 @@
 """Build homeowners.db (SQLite) from the county CSV exports.
 
 Usage:
-    python build_db.py                      # reads SeminoleCounty\\*.csv
+    python build_db.py                               # SeminoleCounty\\*.csv -> homeowners.db
     python build_db.py path\\to\\CountyFolder
+    python build_db.py path\\to\\CountyFolder --db other.db
 
-Re-run whenever a new year's data is dropped in; the database is rebuilt from scratch.
+Normally run for you by update_data.py. The database is rebuilt from scratch each time.
 """
 import csv
 import os
@@ -15,8 +16,13 @@ import time
 from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "SeminoleCounty")
+_args = [a for a in sys.argv[1:]]
 DB_PATH = os.path.join(HERE, "homeowners.db")
+if "--db" in _args:
+    _i = _args.index("--db")
+    DB_PATH = os.path.abspath(_args[_i + 1])
+    del _args[_i:_i + 2]
+DATA_DIR = _args[0] if _args else os.path.join(HERE, "SeminoleCounty")
 
 # Site-address cities seen in Seminole County data. Longest names first so
 # "ALTAMONTE SPRINGS" wins over a shorter partial match.
