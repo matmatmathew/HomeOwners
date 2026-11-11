@@ -1601,10 +1601,11 @@ function downloadInstead(b, why) {
   saveFile(b.name, b.json, 'application/json'); backedUp();
   notesMsg(`${why} The backup was saved to your Downloads as ${b.name} instead. To put it in Google Drive or OneDrive, open that app, tap +, then Upload, and pick it from Downloads.`, true);
 }
+// Android's Chrome only shares certain file types (pictures, video, audio, PDF, plain text…). JSON isn't one,
+// and canShare() doesn't check the type, so a .json share fails later with "Permission denied".
+// The backup is therefore always shared as a plain-text .txt file (same contents; Restore reads it).
 function shareableFile(b) {
-  const asJson = new File([b.json], b.name, { type: 'application/json' });
-  if (navigator.canShare?.({ files: [asJson] })) return asJson;
-  const asText = new File([b.json], b.name.replace(/\.json$/, '.backup.txt'), { type: 'text/plain' });   // Android won't share .json
+  const asText = new File([b.json], b.name.replace(/\.json$/, '.txt'), { type: 'text/plain' });
   return navigator.canShare?.({ files: [asText] }) ? asText : null;
 }
 

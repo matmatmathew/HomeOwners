@@ -9,7 +9,7 @@
 - **PC (Chrome or Edge):** Share backup opens a Save dialog; pick any folder (e.g. your OneDrive or
   Google Drive folder). It opens in the same folder next time.
 
-Backups are named `homeowners-notes-<date>-<time>.json` (Android shares them as `.backup.txt`; both restore).
+Backups are named `homeowners-notes-<date>-<time>.json` (the phone share menu sends them as `.txt`; both restore).
 
 ## Optional later: direct connection
 
