@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Map of owner-occupied (homestead exemption) homes in Seminole County, Florida.">
 <title>HomeOwners</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#7b3fe4">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
@@ -80,8 +84,11 @@
   .notes-box .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .notes-box .btns button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; padding: 9px 10px; }
   .btn-noted { background: var(--noted); border-color: var(--noted); color: #fff; }
-  .notes-box .btns .wide { grid-column: 1 / -1; padding: 11px 10px; font-size: 14px; }
-  .restore-hint { font-size: 11.5px; color: var(--muted); margin-top: -3px; }
+  .cloud-row { display: grid; gap: 4px; }
+  .cloud-label { font-size: 12px; font-weight: 700; color: var(--noted-ink); }
+  .restore-hint { font-size: 11.5px; color: var(--muted); }
+  .nb-links { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+  .linkish { background: none; border: 0; padding: 2px 0; color: var(--noted-ink); text-decoration: underline; font: inherit; font-weight: 600; cursor: pointer; }
   .btn-noted-outline { background: var(--panel); border: 1.5px solid var(--noted); color: var(--noted-ink); }
   .notes-box .msg { font-size: 12px; color: var(--muted); }
   .msg.err { color: #c62828; }
@@ -112,7 +119,32 @@
   .popup .clip-meta { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 11px; color: #667085; }
   .popup .clip-del { padding: 2px 8px; font-size: 11px; background: #fff; color: #1d2330; border-color: #cdb8f6; }
   .popup .clip-meta { color: #5f5678; }
-  .popup .photos { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #cdb8f6; }
+  .popup .photos, .popup .contacts { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #cdb8f6; }
+  .popup .contact-list { display: grid; gap: 6px; margin: 4px 0 6px; }
+  .popup .contact-empty { font-size: 12px; color: #5f5678; }
+  .popup .contact { background: #fff; border: 1px solid #cdb8f6; border-radius: 8px; padding: 6px 8px; }
+  .popup .contact-who { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; font-size: 12.5px; color: #1d2330; }
+  .popup .contact-who span { color: #5f5678; font-size: 12px; }
+  .popup .contact-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+  .popup .cbtn { display: inline-block; padding: 5px 10px; border-radius: 6px; background: #7b3fe4; color: #fff !important;
+                 font-size: 12px; font-weight: 600; text-decoration: none; }
+  .popup .contact-del { padding: 4px 8px; font-size: 11px; background: #fff; color: #1d2330; border-color: #cdb8f6; margin-left: auto; }
+  .popup .contact-pick, .popup .contact-add, .popup .contact-cancel, .popup .share-drop { padding: 6px 8px; font-size: 12px; background: #fff; color: #5a2bb3; border: 1.5px solid #cdb8f6; font-weight: 600; }
+  .popup .contact-form { display: grid; gap: 6px; margin-top: 6px; }
+  .popup .contact-form input { width: 100%; padding: 7px; border: 1.5px solid #cdb8f6; border-radius: 6px; font: inherit; font-size: 13px; background: #fff; color: #1d2330; }
+  .popup .share-in { margin-top: 10px; padding: 8px; border-radius: 8px; background: #fff8e6; border: 1.5px solid #f0c77a; }
+  .popup .share-head { font-weight: 700; font-size: 12.5px; color: #7a4a00; }
+  .popup .share-text { font-size: 12.5px; color: #1d2330; white-space: pre-wrap; margin: 4px 0 6px; max-height: 90px; overflow: auto; }
+  .popup .share-add { padding: 6px 8px; font-size: 12px; font-weight: 600; background: #7b3fe4; color: #fff; border-color: #7b3fe4; }
+  #shareBanner { position: fixed; z-index: 1200; left: 50%; transform: translateX(-50%); top: calc(64px + env(safe-area-inset-top));
+                 width: min(92vw, 520px); background: #fff8e6; color: #3d2a00; border: 1.5px solid #f0c77a; border-radius: 10px;
+                 padding: 9px 12px; box-shadow: 0 3px 12px rgba(0,0,0,.2); font-size: 13px; display: flex; gap: 10px; align-items: flex-start; }
+  #shareBanner[hidden] { display: none; }
+  #shareBanner div { flex: 1; min-width: 0; }
+  #shareBanner b { display: block; }
+  #shareBannerText { color: #5f4a1a; overflow-wrap: anywhere; }
+  #shareBannerClose { padding: 4px 9px; background: #fff; color: #3d2a00; border-color: #f0c77a; }
+  @media (min-width: 801px) { #shareBanner { top: 12px; left: calc(50% + 165px); } }
   .popup .photo-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
   .popup .photo-btn, .popup .photo-take { padding: 6px 8px; font-size: 12px; background: #fff; color: #5a2bb3; border: 1.5px solid #cdb8f6; font-weight: 600; }
   .popup .photo-take { background: #7b3fe4; color: #fff; border-color: #7b3fe4; }
@@ -227,16 +259,24 @@
     </div>
     <div class="legend"><span><span class="dot home"></span> Owner-occupied home</span><span><span class="dot noted"></span> Has my notes</span></div>
     <div class="backup-status" id="backupStatus" role="status">Nothing to back up yet.</div>
-    <div class="btns">
-      <button id="cloudBackup" type="button" class="btn-noted wide">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 9.2 4.5 4.5 0 0 0 7 18z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 15V10M9.5 12.5 12 10l2.5 2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Save to Drive / OneDrive</button>
-      <button id="backupNotes" type="button" class="btn-noted-outline">
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Download</button>
-      <button id="restoreNotes" type="button" class="btn-noted-outline">
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Restore</button>
+    <div class="cloud-row"><span class="cloud-label">☁ Back up to</span>
+      <div class="btns">
+        <button id="gBackup" type="button" class="btn-noted">Google Drive</button>
+        <button id="mBackup" type="button" class="btn-noted">OneDrive</button>
+      </div>
+    </div>
+    <div class="cloud-row"><span class="cloud-label">↺ Restore latest from</span>
+      <div class="btns">
+        <button id="gRestore" type="button" class="btn-noted-outline">Google Drive</button>
+        <button id="mRestore" type="button" class="btn-noted-outline">OneDrive</button>
+      </div>
+    </div>
+    <div class="restore-hint">Backups go in a <b>HomeOwners</b> folder in your Google Drive or OneDrive.</div>
+    <div class="nb-links">
+      <button id="backupNotes" type="button" class="linkish">Download a copy</button><span aria-hidden="true">·</span>
+      <button id="restoreNotes" type="button" class="linkish">Restore from a file</button>
       <input type="file" id="restoreFile" accept=".json,.txt,application/json,text/plain" hidden>
     </div>
-    <div class="restore-hint">To restore from the cloud, tap Restore and pick the backup file from Drive or OneDrive.</div>
     <div class="msg" id="notesMsg">Text, voice and photo notes are saved on this device only. Back up to keep them safe or to move them to another device.</div>
   </section>
 
@@ -314,6 +354,11 @@
 
 <div id="toast" role="status" aria-live="polite" hidden></div>
 
+<div id="shareBanner" role="status" hidden>
+  <div><b>📩 Message ready to add</b><span id="shareBannerText"></span><br>Open a home, then tap <b style="display:inline">Add to this home</b>.</div>
+  <button type="button" id="shareBannerClose">Discard</button>
+</div>
+
 <div id="viewer" role="dialog" aria-modal="true" aria-label="Photo" hidden>
   <div class="vimg"><img id="viewerImg" alt="Photo note"></div>
   <div class="vbar"><span id="viewerWhen"></span><button type="button" id="viewerDelete">Delete photo</button><button type="button" id="viewerClose">Close</button></div>
@@ -350,8 +395,18 @@ function persistNotes() {
   try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); return true; }
   catch (e) { notesMsg('This browser is not letting the site save notes (private browsing or storage turned off).', true); return false; }
 }
-// a home "has notes" if it has a text note or at least one voice note
-const hasNote = p => !!(notes[p] && notes[p].text) || (voiceCounts.get(p) || 0) > 0 || (photoCounts.get(p) || 0) > 0;
+// ---------- contacts linked to a home: kept in this browser, keyed by parcel number
+const CONTACTS_KEY = 'homeowners.contacts.v1';
+let contacts = {};         // { parcel: [ { id, name, tel, email, added } ] }
+try { contacts = JSON.parse(localStorage.getItem(CONTACTS_KEY) || '{}') || {}; } catch (e) { contacts = {}; }
+function persistContacts() {
+  try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts)); return true; }
+  catch (e) { toast('This browser is not letting the site save contacts (private browsing or storage turned off).', true); return false; }
+}
+const contactsOf = p => contacts[p] || [];
+
+// a home "has notes" if it has a text note, voice note, photo or linked contact
+const hasNote = p => !!(notes[p] && notes[p].text) || (voiceCounts.get(p) || 0) > 0 || (photoCounts.get(p) || 0) > 0 || contactsOf(p).length > 0;
 function notesMsg(text, err) {
   const m = $('#notesMsg'); m.textContent = text; m.classList.toggle('err', !!err);
   toast(text, err);   // also show it on screen, since the side panel is hidden on phones
@@ -367,6 +422,7 @@ function updateNoteCount() {
   const homes = new Set(Object.keys(notes));
   voiceCounts.forEach((n, p) => { if (n > 0) homes.add(p); });
   photoCounts.forEach((n, p) => { if (n > 0) homes.add(p); });
+  Object.keys(contacts).forEach(p => { if (contacts[p].length) homes.add(p); });
   $('#noteCount').textContent = homes.size.toLocaleString() + (homes.size === 1 ? ' home' : ' homes');
   renderBackupStatus(homes.size);
 }
@@ -518,6 +574,25 @@ function popupHtml(i) {
       <label class="sub-label" for="note-${i}">Text note</label>
       <textarea id="note-${i}" data-i="${i}" placeholder="Type a note about this home. It saves automatically.">${esc(n ? n.text : '')}</textarea>
       <div class="note-row"><button type="button" class="note-del" data-i="${i}"${n ? '' : ' hidden'}>Delete note</button><span class="note-status">${esc(savedWhen(r[P]))}</span></div>
+      ${pendingShare ? `<div class="share-in" data-i="${i}">
+        <div class="share-head">📩 Shared message</div>
+        <div class="share-text">${esc(pendingShare.length > 240 ? pendingShare.slice(0, 240) + '…' : pendingShare)}</div>
+        <div class="photo-btns"><button type="button" class="share-add" data-i="${i}">Add to this home</button><button type="button" class="share-drop">Discard</button></div>
+      </div>` : ''}
+      <div class="contacts" data-i="${i}">
+        <div class="vlabel">Contacts</div>
+        <div class="contact-list">${contactsHtml(i)}</div>
+        <div class="photo-btns">
+          ${canPickContacts ? `<button type="button" class="contact-pick" data-i="${i}">👤 Pick from contacts</button>` : ''}
+          <button type="button" class="contact-add" data-i="${i}"${canPickContacts ? '' : ' style="grid-column:1/-1"'}>＋ Add contact</button>
+        </div>
+        <form class="contact-form" data-i="${i}" hidden>
+          <input type="text" name="name" placeholder="Name" aria-label="Contact name" autocomplete="off">
+          <input type="tel" name="tel" placeholder="Phone" aria-label="Phone number" autocomplete="off">
+          <input type="email" name="email" placeholder="Email (optional)" aria-label="Email" autocomplete="off">
+          <div class="photo-btns"><button type="submit" class="photo-take">Save contact</button><button type="button" class="contact-cancel">Cancel</button></div>
+        </form>
+      </div>
       <div class="voice" data-i="${i}">
         <div class="voice-head"><span class="vlabel">Voice notes</span><button type="button" class="rec-btn" data-i="${i}">● Record</button></div>
         <div class="voice-msg" role="status"></div>
@@ -690,6 +765,113 @@ document.addEventListener('click', async e => {
     renderVoice(i);
   }
 });
+// ---------- contacts in the popup: pick from the phone (Android Chrome) or type them in
+const canPickContacts = 'contacts' in navigator && typeof navigator.contacts?.select === 'function';
+const telHref = t => String(t || '').replace(/[^\d+*#,;]/g, '');
+function contactsHtml(i) {
+  const list = contactsOf(rows[i][P]);
+  if (!list.length) return '<div class="contact-empty">No contacts linked yet.</div>';
+  return list.map(c => {
+    const tel = telHref(c.tel);
+    return `<div class="contact">
+      <div class="contact-who"><b>${esc(c.name || 'Unnamed')}</b>${c.tel ? `<span>${esc(c.tel)}</span>` : ''}${c.email ? `<span>${esc(c.email)}</span>` : ''}</div>
+      <div class="contact-acts">
+        ${tel ? `<a class="cbtn" href="tel:${tel}">📞 Call</a><a class="cbtn" href="sms:${tel}">💬 Text</a>` : ''}
+        ${c.email ? `<a class="cbtn" href="mailto:${esc(c.email)}">✉ Email</a>` : ''}
+        <button type="button" class="contact-del" data-i="${i}" data-id="${esc(c.id)}" aria-label="Remove ${esc(c.name || 'contact')}">Remove</button>
+      </div></div>`;
+  }).join('');
+}
+function renderContacts(i) { const el = document.querySelector(`.popup .contacts[data-i="${i}"] .contact-list`); if (el) el.innerHTML = contactsHtml(i); }
+function addContacts(i, list) {
+  const p = rows[i][P], had = hasNote(p);
+  const cur = contactsOf(p).slice();
+  let added = 0;
+  for (const c of list) {
+    const name = (c.name || '').trim(), tel = (c.tel || '').trim(), email = (c.email || '').trim();
+    if (!name && !tel && !email) continue;
+    if (cur.some(x => (tel && telHref(x.tel) === telHref(tel)) || (!tel && email && x.email === email && x.name === name))) continue;  // already linked
+    cur.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name, tel, email, added: new Date().toISOString() });
+    added++;
+  }
+  if (!added) return 0;
+  contacts[p] = cur;
+  if (!persistContacts()) return 0;
+  homeNotesChanged(i, had);
+  renderContacts(i);
+  return added;
+}
+document.addEventListener('click', async e => {
+  const pick = e.target.closest('.popup .contact-pick');
+  if (pick) {
+    const i = Number(pick.dataset.i);
+    try {
+      const sel = await navigator.contacts.select(['name', 'tel', 'email'], { multiple: true });
+      const n = addContacts(i, (sel || []).map(c => ({ name: c.name?.[0], tel: c.tel?.[0], email: c.email?.[0] })));
+      if (sel?.length) toast(n ? `Linked ${plural(n, 'contact')}.` : 'Those contacts are already linked to this home.');
+    } catch (err) { toast('Could not open your contacts: ' + (err?.message || err), true); }
+    return;
+  }
+  const add = e.target.closest('.popup .contact-add');
+  if (add) { const f = document.querySelector(`.popup .contact-form[data-i="${add.dataset.i}"]`); f.hidden = false; f.elements.name.focus(); return; }
+  const cancel = e.target.closest('.popup .contact-cancel');
+  if (cancel) { const f = cancel.closest('form'); f.reset(); f.hidden = true; return; }
+  const del = e.target.closest('.popup .contact-del');
+  if (del) {
+    if (!del.dataset.armed) {          // first tap arms, second tap removes
+      del.dataset.armed = '1'; del.textContent = 'Tap again';
+      setTimeout(() => { if (del.isConnected) { delete del.dataset.armed; del.textContent = 'Remove'; } }, 3000);
+      return;
+    }
+    const i = Number(del.dataset.i), p = rows[i][P], had = hasNote(p);
+    contacts[p] = contactsOf(p).filter(c => c.id !== del.dataset.id);
+    if (!contacts[p].length) delete contacts[p];
+    persistContacts(); homeNotesChanged(i, had); renderContacts(i);
+  }
+});
+document.addEventListener('submit', e => {
+  const f = e.target.closest('.popup .contact-form'); if (!f) return;
+  e.preventDefault();
+  const i = Number(f.dataset.i), name = f.elements.name.value, tel = f.elements.tel.value, email = f.elements.email.value;
+  if (!name.trim() && !tel.trim()) { toast('Enter at least a name or a phone number.', true); return; }
+  const n = addContacts(i, [{ name, tel, email }]);
+  if (!n) toast('That contact is already linked to this home.');
+  f.reset(); f.hidden = true;
+});
+
+// ---------- text shared into the app (Android: Share > HomeOwners from Messages or any app)
+let pendingShare = null;
+(() => {
+  const q = new URLSearchParams(location.search);
+  const parts = [q.get('title'), q.get('text'), q.get('url')].map(s => (s || '').trim()).filter(Boolean);
+  if (q.has('share') || parts.length) {
+    pendingShare = [...new Set(parts)].join('\n') || null;
+    history.replaceState(null, '', location.pathname);   // tidy the address so a reload doesn't share again
+  }
+})();
+function showShareBanner() {
+  const b = $('#shareBanner'); if (!b) return;
+  b.hidden = !pendingShare;
+  if (pendingShare) $('#shareBannerText').textContent = pendingShare.length > 90 ? pendingShare.slice(0, 90) + '…' : pendingShare;
+}
+function dropShare() { pendingShare = null; showShareBanner(); document.querySelectorAll('.popup .share-in').forEach(el => el.remove()); }
+document.addEventListener('click', e => {
+  if (e.target.closest('.share-drop') || e.target.closest('#shareBannerClose')) { dropShare(); return; }
+  const add = e.target.closest('.popup .share-add'); if (!add || !pendingShare) return;
+  const i = Number(add.dataset.i), p = rows[i][P];
+  const stamp = new Date().toLocaleString();
+  const entry = `[${stamp} · shared message]\n${pendingShare}`;
+  const before = notes[p]?.text || '';
+  const text = before ? before + '\n\n' + entry : entry;
+  saveNote(i, text);
+  const ta = document.querySelector(`.popup textarea[data-i="${i}"]`);
+  if (ta) { ta.value = text; ta.scrollTop = ta.scrollHeight; }
+  const box = ta?.closest('.notes');
+  if (box) { box.querySelector('.note-status').textContent = savedWhen(p); box.querySelector('.note-del').hidden = false; }
+  dropShare();
+  toast('Message added to this home\'s note.');
+});
+
 // ---------- photo notes: take or choose pictures, shrunk to save space, kept on this device
 const photoBox = i => document.querySelector(`.popup .photos[data-i="${i}"]`);
 function photoMsg(i, text, err) {
@@ -1111,14 +1293,15 @@ $('#reset').addEventListener('click', () => {
 $('#export').addEventListener('click', () => {
   const head = ['Parcel', 'Owner', 'Street', 'City', 'ZIP', 'Tax bill mailed to', 'Property type', 'Subdivision',
                 'Year built', 'Living sq ft', 'Bedrooms', 'Bathrooms', 'Pool', 'Market value', 'Last sale date',
-                'Last sale amount', 'Latitude', 'Longitude', 'My notes', 'Voice notes', 'Photos'];
+                'Last sale amount', 'Latitude', 'Longitude', 'My notes', 'Voice notes', 'Photos', 'Contacts'];
   const q = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   const lines = [head.join(',')];
   for (const i of sortedTop(current)) {
     const r = rows[i];
     lines.push([parcelFmt(r[P]), r[OWNER], r[STREET], cityOf(r), r[ZIP], r[MAIL] || 'Same as home',
       D.dors[r[DOR]], D.subs[r[SUB]], r[YB], r[SQFT], r[BD], r[BA], r[POOL] ? 'Yes' : 'No', r[VALUE],
-      r[LSD], r[LSA], r[LAT], r[LON], notes[r[P]]?.text || '', voiceCounts.get(r[P]) || '', photoCounts.get(r[P]) || ''].map(q).join(','));
+      r[LSD], r[LSA], r[LAT], r[LON], notes[r[P]]?.text || '', voiceCounts.get(r[P]) || '', photoCounts.get(r[P]) || '',
+      contactsOf(r[P]).map(c => [c.name, c.tel, c.email].filter(Boolean).join(' ')).join('; ')].map(q).join(','));
   }
   saveFile('homeowners.csv', '﻿' + lines.join('\r\n'), 'text/csv');
 });
@@ -1144,24 +1327,30 @@ const getAllMedia = async name => { try { return await vstore('readonly', s => s
 async function buildBackup() {
   const clips = await getAllMedia('voice'), pics = await getAllMedia('photos');
   const textCount = Object.keys(notes).length;
-  if (!textCount && !clips.length && !pics.length) return null;
+  const contactHomes = Object.keys(contacts).filter(p => contacts[p].length);
+  const contactCount = contactHomes.reduce((n, p) => n + contacts[p].length, 0);
+  if (!textCount && !clips.length && !pics.length && !contactCount) return null;
   const out = {};
   for (const [p, n] of Object.entries(notes)) out[p] = { ...n, ...homeInfo(p) };
+  const contactsOut = {};
+  for (const p of contactHomes) contactsOut[p] = { ...homeInfo(p), list: contacts[p] };
   const voice = [], photos = [];
   for (const c of clips)
     voice.push({ parcel: c.parcel, ...homeInfo(c.parcel), created: c.created, duration: c.duration, type: c.type, audio: await blobToDataUrl(c.blob) });
   for (const ph of pics)
     photos.push({ parcel: ph.parcel, ...homeInfo(ph.parcel), created: ph.created, type: ph.type, image: await blobToDataUrl(ph.blob) });
-  const backup = { app: 'HomeOwners', kind: 'notes-backup', version: 3, exported: new Date().toISOString(),
-                   textNotes: textCount, voiceNotes: voice.length, photoNotes: photos.length, notes: out, voice, photos };
+  const backup = { app: 'HomeOwners', kind: 'notes-backup', version: 4, exported: new Date().toISOString(),
+                   textNotes: textCount, voiceNotes: voice.length, photoNotes: photos.length, contactCount,
+                   notes: out, contacts: contactsOut, voice, photos };
   const json = JSON.stringify(backup);
-  const day = new Date().toISOString().slice(0, 10);
+  const now = new Date(), pad = n => String(n).padStart(2, '0');
+  const when = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
   const mb = json.length / 1e6;
-  return { json, name: `homeowners-notes-${day}.json`, day,
-           summary: `${plural(textCount, 'text note')}, ${plural(voice.length, 'voice note')} and ${plural(photos.length, 'photo')}` +
+  return { json, name: `homeowners-notes-${when}.json`,
+           summary: `${plural(textCount, 'text note')}, ${plural(voice.length, 'voice note')}, ${plural(photos.length, 'photo')} and ${plural(contactCount, 'contact')}` +
                     (mb >= 1 ? ` (${mb.toFixed(1)} MB)` : '') };
 }
-const NOTHING_YET = 'There are no notes to back up yet. Open a home on the map and add a text, voice or photo note.';
+const NOTHING_YET = 'There are no notes to back up yet. Open a home on the map and add a note, photo, voice note or contact.';
 function backedUp() { stamp.set('homeowners.lastBackup', new Date().toISOString()); updateNoteCount(); }
 
 $('#backupNotes').addEventListener('click', async () => {
@@ -1170,69 +1359,7 @@ $('#backupNotes').addEventListener('click', async () => {
   if (!b) { notesMsg(NOTHING_YET); return; }
   saveFile(b.name, b.json, 'application/json');
   backedUp();
-  notesMsg(`Backed up ${b.summary} to ${b.name} in your Downloads. Keep it somewhere safe, or use "Save to Drive / OneDrive".`);
-});
-
-// ---------- "Save to Drive / OneDrive"
-// Phones: the share menu, where Google Drive and OneDrive appear if their apps are installed.
-// Computers: a Save dialog that remembers the folder, so you can pick your OneDrive or Google Drive folder.
-let preparedShare = null;   // a backup built on an earlier tap, waiting for a fresh tap to share it
-function shareableFile(b) {
-  // some browsers only share certain file types; JSON isn't always one of them, plain text is
-  const asJson = new File([b.json], b.name, { type: 'application/json' });
-  if (navigator.canShare?.({ files: [asJson] })) return asJson;
-  const asText = new File([b.json], b.name.replace(/\.json$/, '.backup.txt'), { type: 'text/plain' });
-  return navigator.canShare?.({ files: [asText] }) ? asText : null;
-}
-$('#cloudBackup').addEventListener('click', async () => {
-  const phoneShare = !!navigator.canShare && matchMedia('(pointer: coarse)').matches;
-  // computer with a real Save dialog: open it first (it must open straight from the tap)
-  if (!phoneShare && window.showSaveFilePicker) {
-    const day = new Date().toISOString().slice(0, 10);
-    let handle;
-    try {
-      handle = await showSaveFilePicker({ id: 'homeowners-backup', startIn: 'documents', suggestedName: `homeowners-notes-${day}.json`,
-                                          types: [{ description: 'HomeOwners notes backup', accept: { 'application/json': ['.json'] } }] });
-    } catch (e) { if (e.name !== 'AbortError') notesMsg('Could not open the Save dialog: ' + e.message, true); return; }
-    notesMsg('Preparing backup…');
-    const b = await buildBackup();
-    if (!b) { notesMsg(NOTHING_YET); return; }
-    try { const w = await handle.createWritable(); await w.write(b.json); await w.close(); }
-    catch (e) { notesMsg('Could not save the backup: ' + e.message, true); return; }
-    backedUp();
-    notesMsg(`Saved ${b.summary} as ${handle.name}. If you chose your OneDrive or Google Drive folder, it will sync to the cloud. Next time the dialog opens in the same folder.`);
-    return;
-  }
-  // phone (or a computer browser with sharing): the share menu
-  if (navigator.canShare) {
-    let file = preparedShare && Date.now() - preparedShare.at < 120000 ? preparedShare.file : null;
-    let summary = preparedShare?.summary;
-    if (!file) {
-      notesMsg('Preparing backup…');
-      const b = await buildBackup();
-      if (!b) { notesMsg(NOTHING_YET); return; }
-      file = shareableFile(b); summary = b.summary;
-      if (!file) { saveFile(b.name, b.json, 'application/json'); backedUp(); notesMsg(`This browser can't send files to other apps, so the backup was saved to Downloads as ${b.name}.`); return; }
-    }
-    try {
-      await navigator.share({ files: [file], title: 'HomeOwners notes backup', text: 'HomeOwners notes backup' });
-      preparedShare = null; backedUp();
-      notesMsg(`Sent ${summary}. Make sure you chose Drive or OneDrive in the share menu.`);
-    } catch (e) {
-      if (e.name === 'AbortError') { preparedShare = null; notesMsg('Backup not sent. Nothing was changed.'); }
-      else if (e.name === 'NotAllowedError') {
-        // building a big backup took too long for the browser to treat the share as part of your tap
-        preparedShare = { file, summary, at: Date.now() };
-        notesMsg('Your backup is ready. Tap "Save to Drive / OneDrive" once more to choose where to send it.');
-      } else notesMsg('Could not share the backup: ' + e.message, true);
-    }
-    return;
-  }
-  // no sharing and no Save dialog: plain download
-  const b = await buildBackup();
-  if (!b) { notesMsg(NOTHING_YET); return; }
-  saveFile(b.name, b.json, 'application/json'); backedUp();
-  notesMsg(`Saved ${b.summary} to Downloads as ${b.name}. Move it into your OneDrive or Google Drive folder to keep it in the cloud.`);
+  notesMsg(`Saved ${b.summary} to your Downloads as ${b.name}.`);
 });
 
 // add backed-up voice clips or photos this device doesn't already have (same home + same time = same item)
@@ -1252,17 +1379,14 @@ async function restoreMedia(name, list, dataKey, extra) {
   }
   return res;
 }
-$('#restoreNotes').addEventListener('click', () => $('#restoreFile').click());
-$('#restoreFile').addEventListener('change', async e => {
-  const file = e.target.files[0]; e.target.value = '';
-  if (!file) return;
+// restore never deletes: it adds what this device is missing and keeps the newer text note
+async function restoreBackupText(text, source) {
   let data;
-  try { data = JSON.parse(await file.text()); } catch { data = null; }
+  try { data = JSON.parse(text); } catch { data = null; }
   if (!data || data.kind !== 'notes-backup' || typeof data.notes !== 'object') {
-    notesMsg(`"${file.name}" is not a HomeOwners notes backup. Choose a file made with "Save to Drive / OneDrive" or "Download".`, true);
+    notesMsg(`"${source}" is not a HomeOwners notes backup.`, true);
     return;
   }
-  // merge: add notes this device doesn't have; where both have one, keep the newer
   let added = 0, updated = 0, kept = 0;
   for (const [p, n] of Object.entries(data.notes)) {
     if (!n || typeof n.text !== 'string' || !n.text.trim()) continue;
@@ -1273,7 +1397,18 @@ $('#restoreFile').addEventListener('change', async e => {
     else kept++;
   }
   if (!persistNotes()) return;
-  // voice notes (backup version 2+) and photos (version 3+)
+  let cAdded = 0;   // contacts (backup version 4+)
+  for (const [p, entry] of Object.entries(data.contacts || {})) {
+    const cur = contactsOf(p).slice();
+    for (const c of entry?.list || []) {
+      if (!c || (!c.name && !c.tel && !c.email)) continue;
+      if (cur.some(x => x.id === c.id || (c.tel && telHref(x.tel) === telHref(c.tel)))) continue;
+      cur.push({ id: c.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name: c.name || '', tel: c.tel || '', email: c.email || '', added: c.added || data.exported });
+      cAdded++;
+    }
+    if (cur.length) contacts[p] = cur;
+  }
+  persistContacts();
   if ((data.voice?.length || 0) + (data.photos?.length || 0)) notesMsg('Restoring voice notes and photos…');
   const v = await restoreMedia('voice', data.voice, 'audio', x => ({ duration: x.duration || 0 }));
   const ph = await restoreMedia('photos', data.photos, 'image', () => ({}));
@@ -1282,9 +1417,209 @@ $('#restoreFile').addEventListener('change', async e => {
   map.closePopup();
   search({ redraw: $('#hasNotes').checked });
   const part = (label, r) => `${label}: ${r.added} new, ${r.skipped} already here${r.failed ? `, ${r.failed} could not be read` : ''}.`;
-  notesMsg(`Restored from ${file.name}. Text notes: ${added} new, ${updated} updated, ${kept} already up to date. ` +
-           part('Voice notes', v) + ' ' + part('Photos', ph), v.failed + ph.failed > 0);
+  notesMsg(`Restored from ${source}. Text notes: ${added} new, ${updated} updated, ${kept} already up to date. ` +
+           `Contacts: ${cAdded} new. ` + part('Voice notes', v) + ' ' + part('Photos', ph), v.failed + ph.failed > 0);
+}
+$('#restoreNotes').addEventListener('click', () => $('#restoreFile').click());
+$('#restoreFile').addEventListener('change', async e => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (file) restoreBackupText(await file.text(), file.name);
 });
+
+// ---------- Google Drive and OneDrive: back up into a "HomeOwners" folder, restore the latest backup
+// The client IDs come from the one-time setup in SETUP-CLOUD.md. They are public identifiers, not passwords.
+const CLOUD = {
+  googleClientId: '',
+  microsoftClientId: '',
+};
+const SITE_DIR = location.origin + location.pathname.replace(/[^/]*$/, '');   // e.g. https://matmatmathew.github.io/HomeOwners/
+const FOLDER = 'HomeOwners';
+const BACKUP_TYPE = 'application/json';
+const CLOUD_LABEL = { google: 'Google Drive', microsoft: 'OneDrive' };
+
+// Google: Google Identity Services gives a short-lived token for files this site creates (drive.file)
+let gisLoaded = null, gTokenClient = null, gToken = null;
+function loadGoogle() {
+  if (!CLOUD.googleClientId) return null;
+  if (!gisLoaded) gisLoaded = new Promise((res, rej) => {
+    const s = Object.assign(document.createElement('script'), { src: 'https://accounts.google.com/gsi/client', async: true });
+    s.onload = res; s.onerror = () => { gisLoaded = null; rej(new Error('Could not reach Google sign-in. Check your connection.')); };
+    document.head.append(s);
+  });
+  return gisLoaded;
+}
+function googleToken() {     // call straight from a tap: it may open Google's sign-in window
+  if (gToken && gToken.exp > Date.now() + 60000) return Promise.resolve(gToken.access);
+  if (!window.google?.accounts?.oauth2) { loadGoogle()?.catch(() => {}); return Promise.reject(new Error('Google sign-in is still loading. Tap again in a moment.')); }
+  return new Promise((res, rej) => {
+    gTokenClient = gTokenClient || google.accounts.oauth2.initTokenClient({ client_id: CLOUD.googleClientId, scope: 'https://www.googleapis.com/auth/drive.file', callback: () => {} });
+    gTokenClient.callback = r => {
+      if (r.error) rej(new Error(r.error_description || r.error));
+      else { gToken = { access: r.access_token, exp: Date.now() + r.expires_in * 1000 }; res(gToken.access); }
+    };
+    gTokenClient.error_callback = e => rej(new Error(e?.type === 'popup_closed' ? 'Google sign-in was closed.' : e?.type === 'popup_failed_to_open' ? 'Your browser blocked the sign-in window. Allow pop-ups for this site.' : (e?.message || 'Google sign-in failed.')));
+    gTokenClient.requestAccessToken({ prompt: '' });
+  });
+}
+async function gfetch(token, url, opts = {}) {
+  const r = await fetch(url, { ...opts, headers: { Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
+  if (r.status === 401) { gToken = null; throw new Error('your Google sign-in expired. Tap the button again.'); }
+  if (!r.ok) throw new Error(`Google Drive answered ${r.status}: ${(await r.text()).slice(0, 160)}`);
+  return r;
+}
+async function googleFolder(token) {
+  const cached = stamp.get('homeowners.gFolder');
+  if (cached) {
+    try { const f = await (await gfetch(token, `https://www.googleapis.com/drive/v3/files/${cached}?fields=id,trashed`)).json(); if (!f.trashed) return cached; } catch (e) {}
+  }
+  const q = encodeURIComponent(`name='${FOLDER}' and mimeType='application/vnd.google-apps.folder' and 'root' in parents and trashed=false`);
+  const found = await (await gfetch(token, `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&spaces=drive`)).json();
+  let id = found.files?.[0]?.id;
+  if (!id) {
+    const made = await (await gfetch(token, 'https://www.googleapis.com/drive/v3/files?fields=id', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: FOLDER, mimeType: 'application/vnd.google-apps.folder', parents: ['root'] }) })).json();
+    id = made.id;
+  }
+  stamp.set('homeowners.gFolder', id);
+  return id;
+}
+async function googleUpload(token, b) {
+  const folder = await googleFolder(token);
+  const start = await gfetch(token, 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id', {
+    method: 'POST', headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': BACKUP_TYPE },
+    body: JSON.stringify({ name: b.name, parents: [folder], mimeType: BACKUP_TYPE }) });
+  const loc = start.headers.get('Location');
+  if (!loc) throw new Error('Google Drive did not start the upload.');
+  await gfetch(token, loc, { method: 'PUT', headers: { 'Content-Type': BACKUP_TYPE }, body: new Blob([b.json], { type: BACKUP_TYPE }) });
+}
+async function googleLatest(token) {
+  const folder = await googleFolder(token);
+  const q = encodeURIComponent(`'${folder}' in parents and trashed=false and name contains 'homeowners-notes'`);
+  const list = await (await gfetch(token, `https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime%20desc&pageSize=1&fields=files(id,name)`)).json();
+  const f = list.files?.[0]; if (!f) return null;
+  return { name: f.name, text: await (await gfetch(token, `https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`)).text() };
+}
+
+// Microsoft: sign-in with PKCE in a small window (auth.html sends the result back), then Microsoft Graph
+const MS_AUTH = 'https://login.microsoftonline.com/common/oauth2/v2.0';
+const MS_SCOPE = 'Files.ReadWrite offline_access';
+const GRAPH = 'https://graph.microsoft.com/v1.0/me/drive';
+let msTok = (() => { try { return JSON.parse(localStorage.getItem('homeowners.ms') || 'null'); } catch (e) { return null; } })();
+function saveMs(t) { msTok = t; try { t ? localStorage.setItem('homeowners.ms', JSON.stringify(t)) : localStorage.removeItem('homeowners.ms'); } catch (e) {} }
+const b64url = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function msTokenRequest(params) {
+  const r = await fetch(MS_AUTH + '/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: CLOUD.microsoftClientId, scope: MS_SCOPE, ...params }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((j.error_description || j.error || 'Microsoft sign-in failed.').split(/\r?\n/)[0]);
+  saveMs({ access: j.access_token, refresh: j.refresh_token || msTok?.refresh, exp: Date.now() + j.expires_in * 1000 });
+  return msTok.access;
+}
+function microsoftToken() {  // call straight from a tap: it may open Microsoft's sign-in window
+  if (msTok?.access && msTok.exp > Date.now() + 60000) return Promise.resolve(msTok.access);
+  const popup = msTok?.refresh ? null : window.open('', 'ms-signin', 'width=480,height=660');
+  return (async () => {
+    if (msTok?.refresh) {
+      try { return await msTokenRequest({ grant_type: 'refresh_token', refresh_token: msTok.refresh }); }
+      catch (e) { saveMs(null); throw new Error('your OneDrive sign-in expired. Tap the button again to sign in.'); }
+    }
+    if (!popup) throw new Error('your browser blocked the sign-in window. Allow pop-ups for this site and try again.');
+    const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+    const state = b64url(crypto.getRandomValues(new Uint8Array(12)));
+    try { localStorage.removeItem('homeowners.msAuthResult'); } catch (e) {}
+    popup.location.href = MS_AUTH + '/authorize?' + new URLSearchParams({
+      client_id: CLOUD.microsoftClientId, response_type: 'code', redirect_uri: SITE_DIR + 'auth.html', response_mode: 'query',
+      scope: MS_SCOPE, code_challenge: challenge, code_challenge_method: 'S256', state, prompt: 'select_account' });
+    // auth.html answers by message, or through localStorage if the browser cut the link to this page
+    const result = await new Promise((res, rej) => {
+      const finish = d => { removeEventListener('message', onMsg); removeEventListener('storage', onStore); clearTimeout(timer); res(d); };
+      const onMsg = e => { if (e.origin === location.origin && e.data?.type === 'ms-auth') finish(e.data); };
+      const onStore = e => { if (e.key === 'homeowners.msAuthResult' && e.newValue) finish(JSON.parse(e.newValue)); };
+      const timer = setTimeout(() => { removeEventListener('message', onMsg); removeEventListener('storage', onStore); rej(new Error('Microsoft sign-in timed out.')); }, 5 * 60000);
+      addEventListener('message', onMsg); addEventListener('storage', onStore);
+    });
+    try { localStorage.removeItem('homeowners.msAuthResult'); } catch (e) {}
+    if (result.error) throw new Error(result.error_description || result.error);
+    if (result.state !== state) throw new Error('Microsoft sign-in did not match. Please try again.');
+    return msTokenRequest({ grant_type: 'authorization_code', code: result.code, redirect_uri: SITE_DIR + 'auth.html', code_verifier: verifier });
+  })();
+}
+async function mfetch(token, url, opts = {}) {
+  const r = await fetch(url, { ...opts, headers: { Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
+  if (r.status === 401) { saveMs(msTok?.refresh ? { ...msTok, access: null, exp: 0 } : null); throw new Error('your OneDrive sign-in expired. Tap the button again.'); }
+  return r;
+}
+async function oneDriveUpload(token, b) {
+  const path = `${GRAPH}/root:/${FOLDER}/${encodeURIComponent(b.name)}`;
+  const blob = new Blob([b.json], { type: BACKUP_TYPE });
+  if (blob.size <= 4e6) {
+    const r = await mfetch(token, `${path}:/content`, { method: 'PUT', headers: { 'Content-Type': BACKUP_TYPE }, body: blob });
+    if (!r.ok) throw new Error(`OneDrive answered ${r.status}.`);
+    return;
+  }
+  // bigger backups (lots of photos) go up in pieces
+  const s = await mfetch(token, `${path}:/createUploadSession`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'rename' } }) });
+  if (!s.ok) throw new Error(`OneDrive answered ${s.status}.`);
+  const { uploadUrl } = await s.json();
+  const CHUNK = 320 * 1024 * 12;   // OneDrive wants multiples of 320 KB
+  for (let at = 0; at < blob.size; at += CHUNK) {
+    const end = Math.min(blob.size, at + CHUNK);
+    const r = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Range': `bytes ${at}-${end - 1}/${blob.size}` }, body: blob.slice(at, end) });
+    if (!r.ok) throw new Error(`OneDrive upload stopped (${r.status}).`);
+  }
+}
+async function oneDriveLatest(token) {
+  const r = await mfetch(token, `${GRAPH}/root:/${FOLDER}:/children?$top=200`);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`OneDrive answered ${r.status}.`);
+  const items = ((await r.json()).value || []).filter(x => x.file && /^homeowners-notes/.test(x.name))
+    .sort((a, b) => b.lastModifiedDateTime.localeCompare(a.lastModifiedDateTime));
+  const f = items[0]; if (!f) return null;
+  const d = await fetch(f['@microsoft.graph.downloadUrl']);
+  if (!d.ok) throw new Error(`OneDrive download failed (${d.status}).`);
+  return { name: f.name, text: await d.text() };
+}
+
+// the four buttons
+const cloudConfigured = svc => !!(svc === 'google' ? CLOUD.googleClientId : CLOUD.microsoftClientId);
+const tokenFor = svc => svc === 'google' ? googleToken() : microsoftToken();   // started synchronously inside the tap
+async function cloudBackup(svc) {
+  const label = CLOUD_LABEL[svc];
+  if (!cloudConfigured(svc)) { notesMsg(`${label} isn't connected yet. It needs the one-time setup. Until then, use "Download a copy" and upload that file to ${label}.`, true); return; }
+  const tokenP = tokenFor(svc);
+  notesMsg(`Signing in to ${label}…`);
+  try {
+    const token = await tokenP;
+    notesMsg('Preparing backup…');
+    const b = await buildBackup();
+    if (!b) { notesMsg(NOTHING_YET); return; }
+    notesMsg(`Uploading to ${label}…`);
+    await (svc === 'google' ? googleUpload : oneDriveUpload)(token, b);
+    backedUp();
+    notesMsg(`Backed up ${b.summary} to ${label} › ${FOLDER} › ${b.name}.`);
+  } catch (e) { notesMsg(`${label} backup didn't finish: ${e.message}`, true); }
+}
+async function cloudRestore(svc) {
+  const label = CLOUD_LABEL[svc];
+  if (!cloudConfigured(svc)) { notesMsg(`${label} isn't connected yet. It needs the one-time setup. Until then, use "Restore from a file".`, true); return; }
+  const tokenP = tokenFor(svc);
+  notesMsg(`Signing in to ${label}…`);
+  try {
+    const token = await tokenP;
+    notesMsg(`Looking for your latest backup in ${label} › ${FOLDER}…`);
+    const latest = await (svc === 'google' ? googleLatest : oneDriveLatest)(token);
+    if (!latest) { notesMsg(`There are no backups in ${label} › ${FOLDER} yet.`); return; }
+    await restoreBackupText(latest.text, `${label} › ${latest.name}`);
+  } catch (e) { notesMsg(`${label} restore didn't finish: ${e.message}`, true); }
+}
+$('#gBackup').addEventListener('click', () => cloudBackup('google'));
+$('#mBackup').addEventListener('click', () => cloudBackup('microsoft'));
+$('#gRestore').addEventListener('click', () => cloudRestore('google'));
+$('#mRestore').addEventListener('click', () => cloudRestore('microsoft'));
+loadGoogle()?.catch(() => {});   // load Google sign-in early so the first tap can open it
 
 // ---------- mobile drawer / list sheet
 function setList(open) {
@@ -1326,6 +1661,7 @@ function countBy(col) { const c = new Map(); for (const r of rows) c.set(r[col],
   $('#loading').remove();
   search();
   restoreSession();
+  showShareBanner();
 })();
 </script>
 </body>

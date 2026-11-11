@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HomeOwners sign-in</title>
+<style>
+  :root { --bg: #f4effe; --ink: #3d2a66; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1a1424; --ink: #e2d6ff; color-scheme: dark; } }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 0 16px; text-align: center; }
+</style>
+</head>
+<body>
+<p id="msg">Finishing sign-in…</p>
+<script>
+// Microsoft sends the sign-in result here. Hand it back to the HomeOwners page and close this window.
+const q = new URLSearchParams(location.search);
+const result = { type: 'ms-auth', code: q.get('code'), state: q.get('state'), error: q.get('error'), error_description: q.get('error_description') };
+let delivered = false;
+try { if (window.opener && !window.opener.closed) { window.opener.postMessage(result, location.origin); delivered = true; } } catch (e) {}
+// backup route if the browser cut the link between the windows: the HomeOwners page listens for this
+try { localStorage.setItem('homeowners.msAuthResult', JSON.stringify(result)); } catch (e) {}
+document.getElementById('msg').textContent = result.error
+  ? 'Sign-in did not finish: ' + (result.error_description || result.error)
+  : 'Signed in. You can close this window and go back to HomeOwners.';
+setTimeout(() => window.close(), delivered ? 300 : 1500);
+</script>
+</body>
+</html>
