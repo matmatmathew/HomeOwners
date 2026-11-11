@@ -176,6 +176,10 @@ public class HomeOwnersPlugin extends Plugin {
             send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             Intent chooser = Intent.createChooser(send, "Save HomeOwners backup to…");
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {   // don't offer HomeOwners itself as a place to send it
+                chooser.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, new android.content.ComponentName[] {
+                    new android.content.ComponentName(getContext(), MainActivity.class) });
+            }
             getActivity().startActivity(chooser);
             JSObject ret = new JSObject();
             ret.put("name", file.getName());

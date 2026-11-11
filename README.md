@@ -35,3 +35,22 @@ Then open http://localhost:8770 (location works on localhost too).
 - Sales history comes from `AllSales.csv` and includes non-market transfers (e.g. $100 quit-claim deeds)
   and multi-parcel sales. "Last sale price" is the amount on the most recent record.
 - Map tiles: OpenStreetMap.
+
+## Android app
+
+`android-app/` is a Capacitor 7 app that loads the live site and adds native features through
+`HomeOwnersPlugin.java`: Android's contact picker, a linked contact's text messages (READ_SMS),
+share/save files, text shared in from other apps, and keep-screen-on. The site detects the app
+(`NATIVE` in `docs/index.html`) and uses those features; on the web they stay off.
+
+The installable file is `docs/app/HomeOwners.apk` (linked from the site on Android phones).
+Website changes reach the app automatically; rebuild the APK only after changing `android-app/`:
+
+```
+cd android-app && npx cap sync android
+cd android && set JAVA_HOME=C:\Program Files\Android\Android Studio\jbr && gradlew assembleDebug
+copy app\build\outputs\apk\debug\app-debug.apk ..\..\docs\app\HomeOwners.apk
+```
+
+On the SCPS network the build needs `android-app/.build-certs/truststore.jks` (Java's trust list plus the
+school firewall certificate; see `android/gradle.properties`). On other networks remove those two lines.
