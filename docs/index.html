@@ -85,6 +85,39 @@
   .notes-box .btns button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; padding: 9px 10px; }
   .btn-noted { background: var(--noted); border-color: var(--noted); color: #fff; }
   .cloud-row { display: grid; gap: 4px; }
+  .notes-box .cs-open { padding: 7px 10px; font-weight: 600; }
+  /* ---- Cloud setup screen */
+  #cloudSetup { position: fixed; inset: 0; z-index: 3500; background: rgba(20, 12, 40, .55); display: flex; justify-content: center;
+                align-items: flex-start; overflow-y: auto; padding: calc(16px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  #cloudSetup[hidden] { display: none; }
+  .cs-card { width: min(100%, 600px); background: var(--panel); color: var(--text); border-radius: 14px; padding: 16px 18px 18px;
+             box-shadow: 0 10px 40px rgba(0,0,0,.35); display: grid; gap: 14px; }
+  .cs-head { display: flex; align-items: center; gap: 10px; }
+  .cs-head h2 { margin: 0; font-size: 18px; flex: 1; color: var(--noted-ink); }
+  .cs-intro { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+  .cs-svc, .cs-other { border: 1.5px solid var(--noted-line); border-radius: 10px; padding: 12px; background: var(--noted-bg); display: grid; gap: 8px; }
+  .cs-svc h3, .cs-other h3 { margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .cs-other p { margin: 0; font-size: 13px; color: var(--muted); }
+  .cs-status { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--line); color: var(--text); }
+  .cs-status[data-state="ready"] { background: var(--warn-bg); color: var(--warn); }
+  .cs-status[data-state="on"] { background: #1a7f4b; color: #fff; }
+  .cs-svc details { font-size: 13px; }
+  .cs-svc summary { cursor: pointer; font-weight: 600; color: var(--noted-ink); }
+  .cs-svc ol { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 7px; line-height: 1.45; }
+  .cs-svc a { color: var(--accent); font-weight: 600; }
+  .cs-copy { display: flex; gap: 6px; align-items: center; margin: 4px 0; min-width: 0; }
+  .cs-copy code { flex: 1; min-width: 0; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--noted-line); border-radius: 6px; padding: 5px 7px; font-size: 12px; }
+  .cs-copy button { padding: 5px 10px; font-weight: 600; }
+  .cs-label { display: grid; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--noted-ink); }
+  .cs-label input { width: 100%; padding: 8px 9px; border: 1.5px solid var(--noted-line); border-radius: 6px; font: inherit; font-size: 14px; background: var(--panel); color: var(--text); }
+  .cs-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .cs-btns button, #csShareLink { padding: 9px 8px; font-weight: 600; }
+  .cs-save, .cs-connect, #csShareLink { background: var(--noted); border-color: var(--noted); color: #fff; }
+  .cs-btns button:disabled { opacity: .45; cursor: not-allowed; }
+  .cs-msg { font-size: 12.5px; color: var(--text); min-height: 1em; }
+  .cs-msg.err { color: #c62828; }
+  .cs-linkout { font-size: 12px; overflow-wrap: anywhere; color: var(--muted); }
+  @media (max-width: 800px) { .cs-label input { font-size: 16px; } }
   .cloud-label { font-size: 12px; font-weight: 700; color: var(--noted-ink); }
   .restore-hint { font-size: 11.5px; color: var(--muted); }
   .nb-links { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
@@ -129,9 +162,8 @@
   .popup .cbtn { display: inline-block; padding: 5px 10px; border-radius: 6px; background: #7b3fe4; color: #fff !important;
                  font-size: 12px; font-weight: 600; text-decoration: none; }
   .popup .contact-del { padding: 4px 8px; font-size: 11px; background: #fff; color: #1d2330; border-color: #cdb8f6; margin-left: auto; }
-  .popup .contact-pick, .popup .contact-add, .popup .contact-cancel, .popup .share-drop { padding: 6px 8px; font-size: 12px; background: #fff; color: #5a2bb3; border: 1.5px solid #cdb8f6; font-weight: 600; }
-  .popup .contact-form { display: grid; gap: 6px; margin-top: 6px; }
-  .popup .contact-form input { width: 100%; padding: 7px; border: 1.5px solid #cdb8f6; border-radius: 6px; font: inherit; font-size: 13px; background: #fff; color: #1d2330; }
+  .popup .share-drop { padding: 6px 8px; font-size: 12px; background: #fff; color: #5a2bb3; border: 1.5px solid #cdb8f6; font-weight: 600; }
+  .popup .contact-pick { width: 100%; padding: 7px 8px; font-size: 12.5px; background: #7b3fe4; color: #fff; border: 1.5px solid #7b3fe4; font-weight: 600; }
   .popup .share-in { margin-top: 10px; padding: 8px; border-radius: 8px; background: #fff8e6; border: 1.5px solid #f0c77a; }
   .popup .share-head { font-weight: 700; font-size: 12.5px; color: #7a4a00; }
   .popup .share-text { font-size: 12.5px; color: #1d2330; white-space: pre-wrap; margin: 4px 0 6px; max-height: 90px; overflow: auto; }
@@ -271,7 +303,8 @@
         <button id="mRestore" type="button" class="btn-noted-outline">OneDrive</button>
       </div>
     </div>
-    <div class="restore-hint">Backups go in a <b>HomeOwners</b> folder in your Google Drive or OneDrive.</div>
+    <div class="restore-hint">Backups go in a <b>HomeOwners</b> folder in your Google Drive or OneDrive.<br><span id="cloudStatusLine"></span></div>
+    <button type="button" id="openCloudSetup" class="btn-noted-outline cs-open">⚙ Cloud setup</button>
     <div class="nb-links">
       <button id="backupNotes" type="button" class="linkish">Download a copy</button><span aria-hidden="true">·</span>
       <button id="restoreNotes" type="button" class="linkish">Restore from a file</button>
@@ -350,6 +383,60 @@
 <div id="camera" role="dialog" aria-modal="true" aria-label="Take a photo" hidden>
   <div class="vimg"><video id="camVideo" autoplay playsinline muted></video></div>
   <div class="vbar"><span>Point the camera and tap Take photo.</span><button type="button" id="camCancel">Cancel</button><button type="button" id="camSnap">📷 Take photo</button></div>
+</div>
+
+<div id="cloudSetup" role="dialog" aria-modal="true" aria-labelledby="csTitle" hidden>
+  <div class="cs-card">
+    <div class="cs-head"><h2 id="csTitle">Cloud backup setup</h2><button type="button" id="csClose" aria-label="Close">✕</button></div>
+    <p class="cs-intro">Do this once per service. Google and Microsoft only let a website use your Drive or OneDrive after it's
+      registered on their sites, so the first steps happen there. Each step below opens the right page. At the end you
+      paste one ID here and tap <b>Connect</b>.</p>
+
+    <section class="cs-svc" data-svc="google">
+      <h3>Google Drive <span class="cs-status"></span></h3>
+      <details><summary>Setup steps (about 15 minutes)</summary>
+        <ol>
+          <li>Open <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">Google Cloud › New project</a>, signed in with the Google account for your backups. Name it <b>HomeOwners</b> and tap <b>Create</b>.</li>
+          <li>Open <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener">Google Drive API</a> (check the HomeOwners project is selected at the top) and tap <b>Enable</b>.</li>
+          <li>Open <a href="https://console.cloud.google.com/auth/overview" target="_blank" rel="noopener">Google Auth Platform</a> › <b>Get started</b>. App name <b>HomeOwners</b>, your email, Audience <b>External</b>, then finish.</li>
+          <li>In the same place, open <b>Audience</b> › <b>Test users</b> › <b>Add users</b> and add your own Google email.</li>
+          <li>Open <b>Data access</b> › <b>Add or remove scopes</b>, tick <b>…/auth/drive.file</b>, then <b>Update</b> and <b>Save</b>.</li>
+          <li>Open <b>Clients</b> › <b>Create client</b>. Type <b>Web application</b>, name <b>HomeOwners</b>. Under <b>Authorized JavaScript origins</b> tap <b>Add URI</b> and paste:
+            <div class="cs-copy"><code id="csOrigin"></code><button type="button" data-copy="csOrigin">Copy</button></div>
+            Tap <b>Create</b>.</li>
+          <li>Copy the <b>Client ID</b> it shows (it ends in <i>.apps.googleusercontent.com</i>) and paste it below.</li>
+        </ol>
+      </details>
+      <label class="cs-label">Google client ID<input type="text" class="cs-id" id="csGoogleId" autocomplete="off" spellcheck="false" placeholder="1234…apps.googleusercontent.com"></label>
+      <div class="cs-btns"><button type="button" class="cs-save">Save</button><button type="button" class="cs-connect">Connect</button><button type="button" class="cs-off">Disconnect</button></div>
+      <div class="cs-msg" role="status"></div>
+    </section>
+
+    <section class="cs-svc" data-svc="microsoft">
+      <h3>OneDrive <span class="cs-status"></span></h3>
+      <details><summary>Setup steps (about 10 minutes)</summary>
+        <ol>
+          <li>Open <a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener">Microsoft › App registrations</a>, signed in with the Microsoft account for your OneDrive, and tap <b>New registration</b>.</li>
+          <li>Name <b>HomeOwners</b>. Supported account types: <b>Accounts in any organizational directory and personal Microsoft accounts</b>.</li>
+          <li>Redirect URI: choose <b>Single-page application (SPA)</b> and paste:
+            <div class="cs-copy"><code id="csRedirect"></code><button type="button" data-copy="csRedirect">Copy</button></div>
+            Tap <b>Register</b>.</li>
+          <li>Open <b>API permissions</b> › <b>Add a permission</b> › <b>Microsoft Graph</b> › <b>Delegated permissions</b>. Tick <b>Files.ReadWrite</b> and <b>offline_access</b>, then <b>Add permissions</b>.</li>
+          <li>Open <b>Overview</b>, copy the <b>Application (client) ID</b> and paste it below.</li>
+        </ol>
+      </details>
+      <label class="cs-label">OneDrive application (client) ID<input type="text" class="cs-id" id="csMsId" autocomplete="off" spellcheck="false" placeholder="1a2b3c4d-1234-5678-9abc-1234567890ab"></label>
+      <div class="cs-btns"><button type="button" class="cs-save">Save</button><button type="button" class="cs-connect">Connect</button><button type="button" class="cs-off">Disconnect</button></div>
+      <div class="cs-msg" role="status"></div>
+    </section>
+
+    <section class="cs-other">
+      <h3>Your other phone or PC</h3>
+      <p>After setting up here, copy a setup link and open it on your other device. That device then only needs <b>Connect</b>.</p>
+      <button type="button" id="csShareLink">Copy setup link</button>
+      <div id="csLinkOut" class="cs-linkout"></div>
+    </section>
+  </div>
 </div>
 
 <div id="toast" role="status" aria-live="polite" hidden></div>
@@ -582,16 +669,9 @@ function popupHtml(i) {
       <div class="contacts" data-i="${i}">
         <div class="vlabel">Contacts</div>
         <div class="contact-list">${contactsHtml(i)}</div>
-        <div class="photo-btns">
-          ${canPickContacts ? `<button type="button" class="contact-pick" data-i="${i}">👤 Pick from contacts</button>` : ''}
-          <button type="button" class="contact-add" data-i="${i}"${canPickContacts ? '' : ' style="grid-column:1/-1"'}>＋ Add contact</button>
-        </div>
-        <form class="contact-form" data-i="${i}" hidden>
-          <input type="text" name="name" placeholder="Name" aria-label="Contact name" autocomplete="off">
-          <input type="tel" name="tel" placeholder="Phone" aria-label="Phone number" autocomplete="off">
-          <input type="email" name="email" placeholder="Email (optional)" aria-label="Email" autocomplete="off">
-          <div class="photo-btns"><button type="submit" class="photo-take">Save contact</button><button type="button" class="contact-cancel">Cancel</button></div>
-        </form>
+        ${canPickContacts
+          ? `<button type="button" class="contact-pick" data-i="${i}">👤 Pick from contacts</button>`
+          : '<div class="contact-empty">Picking contacts works in Chrome on an Android phone.</div>'}
       </div>
       <div class="voice" data-i="${i}">
         <div class="voice-head"><span class="vlabel">Voice notes</span><button type="button" class="rec-btn" data-i="${i}">● Record</button></div>
@@ -812,10 +892,6 @@ document.addEventListener('click', async e => {
     } catch (err) { toast('Could not open your contacts: ' + (err?.message || err), true); }
     return;
   }
-  const add = e.target.closest('.popup .contact-add');
-  if (add) { const f = document.querySelector(`.popup .contact-form[data-i="${add.dataset.i}"]`); f.hidden = false; f.elements.name.focus(); return; }
-  const cancel = e.target.closest('.popup .contact-cancel');
-  if (cancel) { const f = cancel.closest('form'); f.reset(); f.hidden = true; return; }
   const del = e.target.closest('.popup .contact-del');
   if (del) {
     if (!del.dataset.armed) {          // first tap arms, second tap removes
@@ -828,15 +904,6 @@ document.addEventListener('click', async e => {
     if (!contacts[p].length) delete contacts[p];
     persistContacts(); homeNotesChanged(i, had); renderContacts(i);
   }
-});
-document.addEventListener('submit', e => {
-  const f = e.target.closest('.popup .contact-form'); if (!f) return;
-  e.preventDefault();
-  const i = Number(f.dataset.i), name = f.elements.name.value, tel = f.elements.tel.value, email = f.elements.email.value;
-  if (!name.trim() && !tel.trim()) { toast('Enter at least a name or a phone number.', true); return; }
-  const n = addContacts(i, [{ name, tel, email }]);
-  if (!n) toast('That contact is already linked to this home.');
-  f.reset(); f.hidden = true;
 });
 
 // ---------- text shared into the app (Android: Share > HomeOwners from Messages or any app)
@@ -1427,11 +1494,14 @@ $('#restoreFile').addEventListener('change', async e => {
 });
 
 // ---------- Google Drive and OneDrive: back up into a "HomeOwners" folder, restore the latest backup
-// The client IDs come from the one-time setup in SETUP-CLOUD.md. They are public identifiers, not passwords.
-const CLOUD = {
-  googleClientId: '',
-  microsoftClientId: '',
-};
+// The client IDs come from the one-time setup (the "Cloud setup" screen walks through it). They are public
+// identifiers, not passwords. Built-in values below apply to every device; IDs saved in the setup screen override them.
+const CLOUD_BUILT_IN = { googleClientId: '', microsoftClientId: '' };
+const CLOUD = { ...CLOUD_BUILT_IN };
+try { Object.assign(CLOUD, JSON.parse(localStorage.getItem('homeowners.cloud') || '{}')); } catch (e) {}
+function saveCloudIds() {
+  try { localStorage.setItem('homeowners.cloud', JSON.stringify({ googleClientId: CLOUD.googleClientId, microsoftClientId: CLOUD.microsoftClientId })); } catch (e) {}
+}
 const SITE_DIR = location.origin + location.pathname.replace(/[^/]*$/, '');   // e.g. https://matmatmathew.github.io/HomeOwners/
 const FOLDER = 'HomeOwners';
 const BACKUP_TYPE = 'application/json';
@@ -1588,7 +1658,7 @@ const cloudConfigured = svc => !!(svc === 'google' ? CLOUD.googleClientId : CLOU
 const tokenFor = svc => svc === 'google' ? googleToken() : microsoftToken();   // started synchronously inside the tap
 async function cloudBackup(svc) {
   const label = CLOUD_LABEL[svc];
-  if (!cloudConfigured(svc)) { notesMsg(`${label} isn't connected yet. It needs the one-time setup. Until then, use "Download a copy" and upload that file to ${label}.`, true); return; }
+  if (!cloudConfigured(svc)) { openCloudSetup(svc, `${label} isn't set up yet. Follow the steps below once, then tap Back up again.`); return; }
   const tokenP = tokenFor(svc);
   notesMsg(`Signing in to ${label}…`);
   try {
@@ -1604,7 +1674,7 @@ async function cloudBackup(svc) {
 }
 async function cloudRestore(svc) {
   const label = CLOUD_LABEL[svc];
-  if (!cloudConfigured(svc)) { notesMsg(`${label} isn't connected yet. It needs the one-time setup. Until then, use "Restore from a file".`, true); return; }
+  if (!cloudConfigured(svc)) { openCloudSetup(svc, `${label} isn't set up yet. Follow the steps below once, then tap Restore again.`); return; }
   const tokenP = tokenFor(svc);
   notesMsg(`Signing in to ${label}…`);
   try {
@@ -1620,6 +1690,118 @@ $('#mBackup').addEventListener('click', () => cloudBackup('microsoft'));
 $('#gRestore').addEventListener('click', () => cloudRestore('google'));
 $('#mRestore').addEventListener('click', () => cloudRestore('microsoft'));
 loadGoogle()?.catch(() => {});   // load Google sign-in early so the first tap can open it
+
+// ---------- Cloud setup screen: guided one-time registration, paste the client IDs, connect, disconnect
+const WHO_KEY = { google: 'homeowners.gWho', microsoft: 'homeowners.mWho' };
+const ID_FIELD = { google: 'googleClientId', microsoft: 'microsoftClientId' };
+const ID_OK = { google: s => /^[\w-]+\.apps\.googleusercontent\.com$/.test(s),
+                microsoft: s => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s) };
+const cs = svc => document.querySelector(`#cloudSetup .cs-svc[data-svc="${svc}"]`);
+function csMsg(svc, text, err) { const m = cs(svc).querySelector('.cs-msg'); m.textContent = text; m.classList.toggle('err', !!err); }
+function renderCloudSetup() {
+  for (const svc of ['google', 'microsoft']) {
+    const box = cs(svc), id = CLOUD[ID_FIELD[svc]], who = stamp.get(WHO_KEY[svc]);
+    const connected = svc === 'microsoft' ? !!msTok?.refresh : !!who;
+    const st = box.querySelector('.cs-status');
+    st.textContent = !id ? 'Not set up' : connected && who ? `Connected · ${who}` : 'Set up · tap Connect';
+    st.dataset.state = !id ? 'off' : connected ? 'on' : 'ready';
+    if (document.activeElement !== box.querySelector('.cs-id')) box.querySelector('.cs-id').value = id || '';
+    box.querySelector('.cs-connect').disabled = !id;
+    box.querySelector('.cs-off').disabled = !id;
+    box.querySelector('details').open = !id;
+  }
+  $('#csOrigin').textContent = location.origin;
+  $('#csRedirect').textContent = SITE_DIR + 'auth.html';
+  $('#cloudStatusLine').textContent = ['google', 'microsoft'].map(s => `${CLOUD_LABEL[s]}: ${CLOUD[ID_FIELD[s]] ? (stamp.get(WHO_KEY[s]) ? 'connected' : 'set up') : 'not set up'}`).join(' · ');
+}
+function openCloudSetup(svc, note) {
+  renderCloudSetup();
+  $('#cloudSetup').hidden = false;
+  if (svc) { cs(svc).scrollIntoView({ block: 'start' }); if (note) csMsg(svc, note); }
+  $('#csClose').focus();
+}
+function closeCloudSetup() { $('#cloudSetup').hidden = true; }
+$('#openCloudSetup').addEventListener('click', () => openCloudSetup());
+$('#csClose').addEventListener('click', closeCloudSetup);
+$('#cloudSetup').addEventListener('click', e => { if (e.target.id === 'cloudSetup') closeCloudSetup(); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#cloudSetup').hidden) closeCloudSetup(); });
+$('#cloudSetup').addEventListener('click', async e => {
+  const copy = e.target.closest('[data-copy]');
+  if (copy) {
+    const text = $('#' + copy.dataset.copy).textContent;
+    try { await navigator.clipboard.writeText(text); copy.textContent = 'Copied'; }
+    catch (err) { const r = document.createRange(); r.selectNodeContents($('#' + copy.dataset.copy)); getSelection().removeAllRanges(); getSelection().addRange(r); copy.textContent = 'Selected, copy it'; }
+    setTimeout(() => { copy.textContent = 'Copy'; }, 2000);
+    return;
+  }
+  const box = e.target.closest('.cs-svc'); if (!box) return;
+  const svc = box.dataset.svc, label = CLOUD_LABEL[svc];
+  if (e.target.closest('.cs-save')) {
+    const id = box.querySelector('.cs-id').value.trim();
+    if (!ID_OK[svc](id)) {
+      csMsg(svc, svc === 'google' ? 'That doesn\'t look like a Google client ID. It ends with .apps.googleusercontent.com.'
+                                  : 'That doesn\'t look like a Microsoft Application (client) ID. It looks like 1a2b3c4d-1234-5678-9abc-1234567890ab.', true);
+      return;
+    }
+    if (id !== CLOUD[ID_FIELD[svc]]) {         // a new ID: forget the old sign-in
+      CLOUD[ID_FIELD[svc]] = id; saveCloudIds(); stamp.set(WHO_KEY[svc], '');
+      if (svc === 'google') { gTokenClient = null; gToken = null; stamp.set('homeowners.gFolder', ''); loadGoogle()?.catch(() => {}); }
+      else saveMs(null);
+    }
+    renderCloudSetup();
+    csMsg(svc, `Saved. Now tap Connect to sign in to ${label}.`);
+    return;
+  }
+  if (e.target.closest('.cs-connect')) {
+    const tokenP = tokenFor(svc);          // must start inside the tap (opens the sign-in window)
+    csMsg(svc, `Signing in to ${label}…`);
+    try {
+      const token = await tokenP;
+      let who = '';
+      if (svc === 'google') {
+        const a = await (await gfetch(token, 'https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress)')).json();
+        who = a.user?.emailAddress || a.user?.displayName || 'your Google account';
+        await googleFolder(token);
+      } else {
+        const r = await mfetch(token, `${GRAPH}?$select=owner`);
+        if (!r.ok) throw new Error(`OneDrive answered ${r.status}.`);
+        const d = await r.json();
+        who = d.owner?.user?.email || d.owner?.user?.displayName || 'your Microsoft account';
+      }
+      stamp.set(WHO_KEY[svc], who);
+      renderCloudSetup();
+      csMsg(svc, `Connected to ${label} as ${who}. Backups will go in ${label} › ${FOLDER}.`);
+    } catch (err) { csMsg(svc, `Couldn't connect: ${err.message}`, true); }
+    return;
+  }
+  if (e.target.closest('.cs-off')) {
+    if (svc === 'google') { try { if (gToken) google.accounts.oauth2.revoke(gToken.access, () => {}); } catch (err) {} gToken = null; stamp.set('homeowners.gFolder', ''); }
+    else saveMs(null);
+    stamp.set(WHO_KEY[svc], '');
+    renderCloudSetup();
+    csMsg(svc, `Disconnected from ${label} on this device. Your backups in ${label} were not touched.`);
+  }
+});
+// "Set up another device": a link that carries the two client IDs (public identifiers) to your other phone or PC
+$('#csShareLink').addEventListener('click', async () => {
+  const ids = [CLOUD.googleClientId && 'g:' + CLOUD.googleClientId, CLOUD.microsoftClientId && 'm:' + CLOUD.microsoftClientId].filter(Boolean);
+  if (!ids.length) { toast('Set up Google Drive or OneDrive first.', true); return; }
+  const link = SITE_DIR + '#cloud=' + encodeURIComponent(ids.join(','));
+  try { await navigator.clipboard.writeText(link); toast('Setup link copied. Open it on your other device (email or text it to yourself).'); }
+  catch (e) { $('#csLinkOut').textContent = link; toast('Copy the setup link shown below the button.'); }
+});
+(() => {   // arriving through a setup link
+  const m = location.hash.match(/^#cloud=(.+)$/); if (!m) return;
+  for (const part of decodeURIComponent(m[1]).split(',')) {
+    const [k, v] = [part.slice(0, 1), part.slice(2)];
+    if (k === 'g' && ID_OK.google(v)) CLOUD.googleClientId = v;
+    if (k === 'm' && ID_OK.microsoft(v)) CLOUD.microsoftClientId = v;
+  }
+  saveCloudIds(); history.replaceState(null, '', location.pathname); loadGoogle()?.catch(() => {});
+  setTimeout(() => openCloudSetup(null), 600);
+  toast('Cloud backup is set up on this device. Tap Connect for each service to sign in.');
+})();
+renderCloudSetup();
 
 // ---------- mobile drawer / list sheet
 function setList(open) {
