@@ -1390,6 +1390,7 @@ async function restoreBackupText(text, source) {
     if (cur.length) contacts[p] = cur;
   }
   persistContacts();
+  readyBackup = null;
   if ((data.voice?.length || 0) + (data.photos?.length || 0)) notesMsg('Restoring voice notes and photos…');
   const v = await restoreMedia('voice', data.voice, 'audio', x => ({ duration: x.duration || 0 }));
   const ph = await restoreMedia('photos', data.photos, 'image', () => ({}));
@@ -1592,7 +1593,23 @@ async function driveFolder(svc, pickIfMissing) {
 }
 const homeFolderIn = dir => dir.name === FOLDER ? dir : dir.getDirectoryHandle(FOLDER, { create: true });
 
-let preparedShare = null;   // phone: a backup built on an earlier tap, waiting for a fresh tap to share it
+// phone: keep a ready-made backup so the share menu can open straight from the tap
+let readyBackup = null, readyBuilding = null;   // { key, b, file }
+const backupKey = () => [stamp.get('homeowners.lastChange'), Object.keys(notes).length, Object.keys(contacts).length].join('|');
+function prepareBackup() {
+  const key = backupKey();
+  if (readyBackup && readyBackup.key === key) return Promise.resolve(readyBackup);
+  if (readyBuilding && readyBuilding.key === key) return readyBuilding.p;
+  const p = buildBackup().then(b => { readyBackup = { key, b, file: b ? shareableFile(b) : null }; readyBuilding = null; return readyBackup; },
+                               e => { readyBuilding = null; throw e; });
+  readyBuilding = { key, p };
+  return p;
+}
+function downloadInstead(svc, b, why) {
+  const label = CLOUD_LABEL[svc];
+  saveFile(b.name, b.json, 'application/json'); backedUp();
+  notesMsg(`${why} The backup was saved to your Downloads as ${b.name} instead. To put it in ${label}: open the ${label} app, tap +, then Upload, and pick it from Downloads.`, true);
+}
 function shareableFile(b) {
   const asJson = new File([b.json], b.name, { type: 'application/json' });
   if (navigator.canShare?.({ files: [asJson] })) return asJson;
@@ -1617,27 +1634,25 @@ async function cloudBackup(svc) {
     } catch (e) { notesMsg(`${label} backup didn't finish: ${e.message}`, true); }
     return;
   }
-  // phone: share menu
+  // phone: share menu. The backup is normally built ahead of time (when Filters opens), because Android only
+  // opens the share menu right at the moment of a tap, and building a backup with photos takes a moment.
   if (isPhone() && navigator.canShare) {
-    let file = preparedShare && Date.now() - preparedShare.at < 120000 ? preparedShare.file : null, summary = preparedShare?.summary;
-    if (!file) {
-      notesMsg('Preparing backup…');
-      const b = await buildBackup();
-      if (!b) { notesMsg(NOTHING_YET); return; }
-      file = shareableFile(b); summary = b.summary;
-      if (!file) { saveFile(b.name, b.json, 'application/json'); backedUp(); notesMsg(`This browser can't send files to other apps, so the backup was saved to Downloads as ${b.name}.`); return; }
-    }
+    let ready = readyBackup && readyBackup.key === backupKey() ? readyBackup : null;
+    const instant = !!ready;
+    if (!ready) { notesMsg('Preparing backup…'); ready = await prepareBackup(); }
+    if (!ready.b) { notesMsg(NOTHING_YET); return; }
+    const { b, file } = ready;
+    if (!file) { downloadInstead(svc, b, "This browser can't send files to other apps."); return; }
+    if (file.size > 45e6) { downloadInstead(svc, b, 'The backup is too big for the share menu.'); return; }
     try {
-      toast(`In the menu that opens, tap ${label === 'OneDrive' ? 'OneDrive' : 'Drive'}.`);
-      await navigator.share({ files: [file], title: 'HomeOwners notes backup' });
-      preparedShare = null; backedUp();
-      notesMsg(`Sent ${summary}. In ${label}, pick (or make) a HomeOwners folder if it asks where to save.`);
+      await navigator.share({ files: [file] });
+      backedUp();
+      notesMsg(`Sent ${b.summary}. In ${label}, pick (or make) a HomeOwners folder if it asks where to save.`);
     } catch (e) {
-      if (e.name === 'AbortError') { preparedShare = null; notesMsg('Backup not sent. Nothing was changed.'); }
-      else if (e.name === 'NotAllowedError') {   // building a big backup outlasted the tap
-        preparedShare = { file, summary, at: Date.now() };
-        notesMsg(`Your backup is ready. Tap "${label}" once more to send it.`);
-      } else notesMsg('Could not share the backup: ' + e.message, true);
+      if (e.name === 'AbortError') { notesMsg('Backup not sent. Nothing was changed.'); return; }
+      // the very first build can outlast the tap; it's ready now, so the next tap opens the menu instantly
+      if (e.name === 'NotAllowedError' && !instant) { notesMsg(`Your backup is ready. Tap "${label}" once more to send it.`); return; }
+      downloadInstead(svc, b, `Android didn't open the share menu (${e.name}${e.message ? ': ' + e.message : ''}).`);
     }
     return;
   }
@@ -1721,7 +1736,10 @@ function setList(open) {
   $('#results').classList.toggle('open', open);
   $('#toggleList').textContent = open ? 'Map' : 'List';
 }
-$('#openFilters').addEventListener('click', () => { setList(false); aside.classList.add('open'); });
+$('#openFilters').addEventListener('click', () => {
+  setList(false); aside.classList.add('open');
+  if (isPhone() && navigator.canShare) prepareBackup().catch(() => {});   // so a Drive / OneDrive tap shares instantly
+});
 $('#closeFilters').addEventListener('click', () => aside.classList.remove('open'));
 $('#showResults').addEventListener('click', () => { aside.classList.remove('open'); setList(true); });
 $('#toggleList').addEventListener('click', () => setList(!$('#results').classList.contains('open')));
