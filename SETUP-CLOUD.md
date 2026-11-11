@@ -14,8 +14,8 @@ Backups are named `homeowners-notes-<date>-<time>.json` (Android shares them as 
 ## Optional later: direct connection
 
 For one-tap backup and "restore latest" on phones too, the site must be registered once with Google and
-Microsoft and the client IDs put in `CLOUD_BUILT_IN` in `docs/index.html`. The code for that is already in
-place and switches on by itself when the IDs are filled in.
+Microsoft and the client IDs put in `CLOUD_BUILT_IN` in `docs/index.html`. The connection code is already in
+`docs/index.html` but no button uses it right now; it would need to be wired back in.
 
 | Service | Field | Value |
 |---|---|---|
