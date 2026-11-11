@@ -85,6 +85,27 @@
   .notes-box .btns button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; padding: 9px 10px; }
   .btn-noted { background: var(--noted); border-color: var(--noted); color: #fff; }
   .cloud-row { display: grid; gap: 4px; }
+  .get-app { display: inline-block; margin: 2px 0 8px; padding: 6px 10px; border-radius: 8px; background: var(--noted); color: #fff;
+             font-weight: 700; font-size: 13px; text-decoration: none; }
+  .get-app[hidden] { display: none; }
+  /* ---- Messages viewer (Android app) */
+  #smsView { position: fixed; inset: 0; z-index: 3500; background: rgba(20, 12, 40, .55); display: flex; justify-content: center; align-items: flex-end;
+             padding: calc(12px + env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); }
+  #smsView[hidden] { display: none; }
+  .sms-card { width: min(100%, 560px); max-height: 88vh; display: flex; flex-direction: column; gap: 8px; background: var(--panel); color: var(--text);
+              border-radius: 14px 14px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 30px rgba(0,0,0,.3); }
+  .sms-head { display: flex; align-items: center; gap: 10px; }
+  .sms-head h2 { margin: 0; font-size: 17px; flex: 1; color: var(--noted-ink); }
+  .sms-sub { font-size: 13px; color: var(--muted); }
+  .sms-list { overflow-y: auto; display: grid; gap: 8px; padding: 2px; min-height: 0; flex: 1; }
+  .sms { max-width: 86%; padding: 8px 10px; border-radius: 12px; display: grid; gap: 4px; }
+  .sms.in { justify-self: start; background: var(--bg); border: 1px solid var(--line); }
+  .sms.out { justify-self: end; background: var(--noted-bg); border: 1px solid var(--noted-line); }
+  .sms-meta { font-size: 11px; color: var(--muted); }
+  .sms-body { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .sms-add { justify-self: start; padding: 4px 9px; font-size: 12px; font-weight: 600; background: var(--panel); color: var(--noted-ink); border: 1.5px solid var(--noted-line); }
+  #smsAddAll { padding: 11px; font-weight: 700; background: var(--noted); color: #fff; border-color: var(--noted); }
+  .popup .sms-view { border: 0; cursor: pointer; font-family: inherit; }
   .cloud-label { font-size: 12px; font-weight: 700; color: var(--noted-ink); }
   .restore-hint { font-size: 11.5px; color: var(--muted); }
   .nb-links { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
@@ -248,6 +269,7 @@
 <aside>
   <div class="drawer-head"><h1>HomeOwners</h1><button class="mobile-only" id="closeFilters" aria-label="Close filters">✕</button></div>
   <div class="sub" id="summary">Seminole County, FL · loading…</div>
+  <a id="getApp" class="get-app" href="app/HomeOwners.apk" hidden>📱 Get the Android app</a>
   <p class="about">Every home shown has a homestead exemption, which means the owner lives there as their permanent residence.</p>
 
   <section class="notes-box" aria-labelledby="notesTitle">
@@ -342,6 +364,15 @@
   <div class="vbar"><span>Point the camera and tap Take photo.</span><button type="button" id="camCancel">Cancel</button><button type="button" id="camSnap">📷 Take photo</button></div>
 </div>
 
+<div id="smsView" role="dialog" aria-modal="true" aria-labelledby="smsTitle" hidden>
+  <div class="sms-card">
+    <div class="sms-head"><h2 id="smsTitle">Messages</h2><button type="button" id="smsClose" aria-label="Close">✕</button></div>
+    <div class="sms-sub" id="smsSub"></div>
+    <div class="sms-list" id="smsList"></div>
+    <button type="button" id="smsAddAll" hidden>Add all to this home's note</button>
+  </div>
+</div>
+
 <div id="toast" role="status" aria-live="polite" hidden></div>
 
 <div id="shareBanner" role="status" hidden>
@@ -358,6 +389,10 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 const $ = s => document.querySelector(s);
+// ---------- inside the HomeOwners Android app (android-app/), some features come from the app itself:
+// contact picker, reading a contact's text messages, sharing/saving files, text shared from other apps
+const NATIVE = !!window.Capacitor?.isNativePlatform?.();
+const ho = (method, options = {}) => window.Capacitor.nativePromise('HomeOwners', method, options);
 const aside = $('aside');
 const fmt$ = v => v == null ? '' : '$' + Number(v).toLocaleString();
 const fmtN = v => v == null ? '' : Number(v).toLocaleString();
@@ -750,7 +785,7 @@ document.addEventListener('click', async e => {
   }
 });
 // ---------- contacts in the popup: pick from the phone (Android Chrome) or type them in
-const canPickContacts = 'contacts' in navigator && typeof navigator.contacts?.select === 'function';
+const canPickContacts = NATIVE || ('contacts' in navigator && typeof navigator.contacts?.select === 'function');
 const telHref = t => String(t || '').replace(/[^\d+*#,;]/g, '');
 function contactsHtml(i) {
   const list = contactsOf(rows[i][P]);
@@ -761,6 +796,7 @@ function contactsHtml(i) {
       <div class="contact-who"><b>${esc(c.name || 'Unnamed')}</b>${c.tel ? `<span>${esc(c.tel)}</span>` : ''}${c.email ? `<span>${esc(c.email)}</span>` : ''}</div>
       <div class="contact-acts">
         ${tel ? `<a class="cbtn" href="tel:${tel}">📞 Call</a><a class="cbtn" href="sms:${tel}">💬 Text</a>` : ''}
+        ${tel && NATIVE ? `<button type="button" class="cbtn sms-view" data-i="${i}" data-id="${esc(c.id)}">📨 Messages</button>` : ''}
         ${c.email ? `<a class="cbtn" href="mailto:${esc(c.email)}">✉ Email</a>` : ''}
         <button type="button" class="contact-del" data-i="${i}" data-id="${esc(c.id)}" aria-label="Remove ${esc(c.name || 'contact')}">Remove</button>
       </div></div>`;
@@ -789,6 +825,15 @@ document.addEventListener('click', async e => {
   const pick = e.target.closest('.popup .contact-pick');
   if (pick) {
     const i = Number(pick.dataset.i);
+    if (NATIVE) {     // the app uses Android's own contact picker (one contact at a time)
+      try {
+        const r = await ho('pickContact');
+        if (r.cancelled) return;
+        const n = addContacts(i, [{ name: r.name, tel: r.tel }]);
+        toast(n ? `Linked ${r.name || r.tel}.` : 'That contact is already linked to this home.');
+      } catch (err) { toast('Could not open your contacts: ' + (err?.message || err), true); }
+      return;
+    }
     try {
       const sel = await navigator.contacts.select(['name', 'tel', 'email'], { multiple: true });
       const n = addContacts(i, (sel || []).map(c => ({ name: c.name?.[0], tel: c.tel?.[0], email: c.email?.[0] })));
@@ -809,6 +854,57 @@ document.addEventListener('click', async e => {
     persistContacts(); homeNotesChanged(i, had); renderContacts(i);
   }
 });
+
+// ---------- Messages viewer (Android app only): a linked contact's texts, added to the home's note on request
+let smsCtx = null;   // { i, c, messages }
+async function openMessages(i, id) {
+  const c = contactsOf(rows[i][P]).find(x => x.id === id); if (!c) return;
+  smsCtx = { i, c, messages: [] };
+  $('#smsTitle').textContent = `Messages · ${c.name || c.tel}`;
+  $('#smsSub').textContent = 'Loading messages…'; $('#smsList').innerHTML = ''; $('#smsAddAll').hidden = true;
+  $('#smsView').hidden = false; $('#smsClose').focus();
+  try {
+    const r = await ho('readSms', { phone: c.tel, limit: 300 });
+    smsCtx.messages = r.messages || [];
+    renderMessages();
+  } catch (e) {
+    $('#smsSub').textContent = e?.code === 'DENIED' || /not given/i.test(e?.message || '')
+      ? 'HomeOwners needs permission to read text messages. Tap Messages again and choose Allow, or turn on SMS in Settings › Apps › HomeOwners › Permissions.'
+      : 'Could not read messages: ' + (e?.message || e);
+  }
+}
+function renderMessages() {
+  const { c, messages } = smsCtx;
+  $('#smsSub').textContent = messages.length ? `${plural(messages.length, 'message')} with ${c.tel}, newest first.` : `No text messages found with ${c.tel}.`;
+  $('#smsList').innerHTML = messages.map((m, k) => `<div class="sms ${m.sent ? 'out' : 'in'}">
+      <div class="sms-meta">${m.sent ? 'You' : esc(c.name || c.tel)} · ${esc(new Date(m.date).toLocaleString())}</div>
+      <div class="sms-body">${esc(m.body)}</div>
+      <button type="button" class="sms-add" data-k="${k}">Add to note</button></div>`).join('');
+  $('#smsAddAll').hidden = !messages.length;
+}
+function addMessagesToNote(list) {
+  const { i, c } = smsCtx, p = rows[i][P];
+  const entries = list.slice().sort((a, b) => a.date - b.date)
+    .map(m => `[${new Date(m.date).toLocaleString()} · text ${m.sent ? 'to' : 'from'} ${c.name || c.tel}]\n${m.body}`);
+  const before = notes[p]?.text || '';
+  const fresh = entries.filter(e => !before.includes(e));     // don't add the same message twice
+  if (!fresh.length) { toast('Already in this home\'s note.'); return 0; }
+  const text = (before ? before + '\n\n' : '') + fresh.join('\n\n');
+  saveNote(i, text);
+  const ta = document.querySelector(`.popup textarea[data-i="${i}"]`);
+  if (ta) { ta.value = text; const box = ta.closest('.notes'); box.querySelector('.note-status').textContent = savedWhen(p); box.querySelector('.note-del').hidden = false; }
+  toast(`Added ${plural(fresh.length, 'message')} to this home's note.`);
+  return fresh.length;
+}
+document.addEventListener('click', e => {
+  const v = e.target.closest('.popup .sms-view');
+  if (v) { openMessages(Number(v.dataset.i), v.dataset.id); return; }
+  const add = e.target.closest('#smsList .sms-add');
+  if (add && smsCtx) { addMessagesToNote([smsCtx.messages[Number(add.dataset.k)]]); add.textContent = 'Added ✓'; add.disabled = true; return; }
+  if (e.target.closest('#smsAddAll') && smsCtx) { addMessagesToNote(smsCtx.messages); return; }
+  if (e.target.closest('#smsClose') || e.target.id === 'smsView') $('#smsView').hidden = true;
+});
+addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#smsView').hidden) $('#smsView').hidden = true; });
 
 // ---------- text shared into the app (Android: Share > HomeOwners from Messages or any app)
 let pendingShare = null;
@@ -1137,6 +1233,7 @@ function drawHeading() {
 
 // keep the screen on while tracking (where the browser allows it)
 async function keepAwake(on) {
+  if (NATIVE) { ho('keepAwake', { on }).catch(() => {}); return; }
   try {
     if (on && 'wakeLock' in navigator && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen');
     else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
@@ -1278,6 +1375,11 @@ $('#export').addEventListener('click', () => {
 });
 
 function saveFile(name, text, type) {
+  if (NATIVE) {     // the app saves straight into the phone's Downloads folder
+    ho('saveDownload', { name, text: String(text), mime: type || 'text/plain' })
+      .then(() => toast(`Saved ${name} to your phone's Downloads folder.`), e => toast('Could not save the file: ' + (e?.message || e), true));
+    return;
+  }
   const url = URL.createObjectURL(new Blob([text], { type }));
   const a = Object.assign(document.createElement('a'), { href: url, download: name });
   document.body.append(a); a.click(); a.remove();
@@ -1612,6 +1714,17 @@ function shareableFile(b) {
 // "Share backup": a phone gets its normal share menu (Google Drive, OneDrive, Gmail or any app),
 // a computer gets a Save dialog (any folder, e.g. OneDrive or Google Drive; it remembers the last one).
 async function shareBackup() {
+  if (NATIVE) {     // the app opens Android's share menu itself (no tap-timing or file-type limits)
+    notesMsg('Preparing backup…');
+    const b = await buildBackup();
+    if (!b) { notesMsg(NOTHING_YET); return; }
+    try {
+      await ho('shareText', { name: b.name.replace(/\.json$/, '.txt'), text: b.json, mime: 'text/plain' });
+      backedUp();
+      notesMsg(`Pick Drive, OneDrive or any app to save ${b.summary}.`);
+    } catch (e) { notesMsg('Could not open the share menu: ' + (e?.message || e), true); }
+    return;
+  }
   if (isPhone() && navigator.canShare) {
     // the backup is normally prepared when Filters opens: Android only opens the share menu right at a tap
     let ready = readyBackup && readyBackup.key === backupKey() ? readyBackup : null;
@@ -1653,7 +1766,8 @@ async function shareBackup() {
   notesMsg(`Saved ${b.summary} to your Downloads as ${b.name}.`);
 }
 $('#shareBackup').addEventListener('click', shareBackup);
-$('#backupHint').textContent = isPhone()
+if (!NATIVE && /Android/i.test(navigator.userAgent)) $('#getApp').hidden = false;   // offer the app to Android phone browsers
+$('#backupHint').textContent = isPhone() || NATIVE
   ? 'Share backup opens your phone\'s share menu, so you can save it to Google Drive, OneDrive, email or any other app. Restore backup lets you pick the file from any of them.'
   : 'Share backup opens a Save dialog. Pick any folder, such as your OneDrive or Google Drive folder; it opens there again next time. Restore backup lets you pick the file.';
 loadGoogle()?.catch(() => {});
@@ -1702,6 +1816,14 @@ function countBy(col) { const c = new Map(); for (const r of rows) c.set(r[col],
   search();
   restoreSession();
   showShareBanner();
+  if (NATIVE) {     // text shared into the app from Messages (or any app)
+    ho('getSharedText').then(r => { if (r?.text) { pendingShare = r.text; showShareBanner(); } }).catch(() => {});
+    window.Capacitor.addListener('HomeOwners', 'sharedText', d => {
+      if (!d?.text) return;
+      pendingShare = d.text; showShareBanner();
+      toast('Message received. Open a home, then tap Add to this home.');
+    });
+  }
 })();
 </script>
 </body>

@@ -1,0 +1,12 @@
+{
+  "appId": "io.github.matmatmathew.homeowners",
+  "appName": "HomeOwners",
+  "webDir": "www",
+  "server": {
+    "url": "https://matmatmathew.github.io/HomeOwners/",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

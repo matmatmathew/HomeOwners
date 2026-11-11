@@ -2,3 +2,5 @@ homeowners.db
 homeowners.db.building
 SeminoleCounty/
 __pycache__/
+android-app/node_modules/
+android-app/.build-certs/
