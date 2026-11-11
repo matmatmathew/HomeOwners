@@ -258,25 +258,15 @@
     </div>
     <div class="legend"><span><span class="dot home"></span> Owner-occupied home</span><span><span class="dot noted"></span> Has my notes</span></div>
     <div class="backup-status" id="backupStatus" role="status">Nothing to back up yet.</div>
-    <div class="cloud-row"><span class="cloud-label">☁ Back up to</span>
-      <div class="btns">
-        <button id="gBackup" type="button" class="btn-noted">Google Drive</button>
-        <button id="mBackup" type="button" class="btn-noted">OneDrive</button>
-      </div>
-    </div>
-    <div class="cloud-row"><span class="cloud-label">↺ Restore from</span>
-      <div class="btns">
-        <button id="gRestore" type="button" class="btn-noted-outline">Google Drive</button>
-        <button id="mRestore" type="button" class="btn-noted-outline">OneDrive</button>
-      </div>
-    </div>
-    <div class="restore-hint">Uses the Google Drive and OneDrive you're already signed in to. On a phone, pick Drive or OneDrive in the menu that opens. On a PC, choose each drive's folder once and backups go into its <b>HomeOwners</b> folder.</div>
-    <div class="nb-links">
-      <button id="backupNotes" type="button" class="linkish">Download a copy</button><span aria-hidden="true">·</span>
-      <button id="restoreNotes" type="button" class="linkish">Restore from a file</button>
-      <span id="changeFoldersWrap"><span aria-hidden="true">· </span><button id="changeFolders" type="button" class="linkish">Change PC folders</button></span>
+    <div class="btns">
+      <button id="shareBackup" type="button" class="btn-noted">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4M5 13v6h14v-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Share backup</button>
+      <button id="restoreNotes" type="button" class="btn-noted-outline">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Restore backup</button>
       <input type="file" id="restoreFile" accept=".json,.txt,application/json,text/plain" hidden>
     </div>
+    <div class="restore-hint" id="backupHint"></div>
+    <div class="nb-links"><button id="backupNotes" type="button" class="linkish">Download a copy</button></div>
     <div class="msg" id="notesMsg">Text, voice and photo notes are saved on this device only. Back up to keep them safe or to move them to another device.</div>
   </section>
 
@@ -1304,6 +1294,10 @@ const homeInfo = p => { const r = rowByParcel.get(p); return { address: r ? addr
 
 const getAllMedia = async name => { try { return await vstore('readonly', s => s.getAll(), name) || []; } catch (e) { return []; } };
 
+function backupName() {
+  const now = new Date(), pad = n => String(n).padStart(2, '0');
+  return `homeowners-notes-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}.json`;
+}
 // gathers every note into one backup file's contents (null when there's nothing to back up)
 async function buildBackup() {
   const clips = await getAllMedia('voice'), pics = await getAllMedia('photos');
@@ -1324,10 +1318,8 @@ async function buildBackup() {
                    textNotes: textCount, voiceNotes: voice.length, photoNotes: photos.length, contactCount,
                    notes: out, contacts: contactsOut, voice, photos };
   const json = JSON.stringify(backup);
-  const now = new Date(), pad = n => String(n).padStart(2, '0');
-  const when = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
   const mb = json.length / 1e6;
-  return { json, name: `homeowners-notes-${when}.json`,
+  return { json, name: backupName(),
            summary: `${plural(textCount, 'text note')}, ${plural(voice.length, 'voice note')}, ${plural(photos.length, 'photo')} and ${plural(contactCount, 'contact')}` +
                     (mb >= 1 ? ` (${mb.toFixed(1)} MB)` : '') };
 }
@@ -1605,10 +1597,9 @@ function prepareBackup() {
   readyBuilding = { key, p };
   return p;
 }
-function downloadInstead(svc, b, why) {
-  const label = CLOUD_LABEL[svc];
+function downloadInstead(b, why) {
   saveFile(b.name, b.json, 'application/json'); backedUp();
-  notesMsg(`${why} The backup was saved to your Downloads as ${b.name} instead. To put it in ${label}: open the ${label} app, tap +, then Upload, and pick it from Downloads.`, true);
+  notesMsg(`${why} The backup was saved to your Downloads as ${b.name} instead. To put it in Google Drive or OneDrive, open that app, tap +, then Upload, and pick it from Downloads.`, true);
 }
 function shareableFile(b) {
   const asJson = new File([b.json], b.name, { type: 'application/json' });
@@ -1617,118 +1608,53 @@ function shareableFile(b) {
   return navigator.canShare?.({ files: [asText] }) ? asText : null;
 }
 
-async function cloudBackup(svc) {
-  const label = CLOUD_LABEL[svc];
-  if (cloudConfigured(svc)) {                 // direct connection (only if client IDs are built in)
-    const tokenP = tokenFor(svc);
-    notesMsg(`Signing in to ${label}…`);
-    try {
-      const token = await tokenP;
-      notesMsg('Preparing backup…');
-      const b = await buildBackup();
-      if (!b) { notesMsg(NOTHING_YET); return; }
-      notesMsg(`Uploading to ${label}…`);
-      await (svc === 'google' ? googleUpload : oneDriveUpload)(token, b);
-      backedUp();
-      notesMsg(`Backed up ${b.summary} to ${label} › ${FOLDER} › ${b.name}.`);
-    } catch (e) { notesMsg(`${label} backup didn't finish: ${e.message}`, true); }
-    return;
-  }
-  // phone: share menu. The backup is normally built ahead of time (when Filters opens), because Android only
-  // opens the share menu right at the moment of a tap, and building a backup with photos takes a moment.
+// "Share backup": a phone gets its normal share menu (Google Drive, OneDrive, Gmail or any app),
+// a computer gets a Save dialog (any folder, e.g. OneDrive or Google Drive; it remembers the last one).
+async function shareBackup() {
   if (isPhone() && navigator.canShare) {
+    // the backup is normally prepared when Filters opens: Android only opens the share menu right at a tap
     let ready = readyBackup && readyBackup.key === backupKey() ? readyBackup : null;
     const instant = !!ready;
     if (!ready) { notesMsg('Preparing backup…'); ready = await prepareBackup(); }
     if (!ready.b) { notesMsg(NOTHING_YET); return; }
     const { b, file } = ready;
-    if (!file) { downloadInstead(svc, b, "This browser can't send files to other apps."); return; }
-    if (file.size > 45e6) { downloadInstead(svc, b, 'The backup is too big for the share menu.'); return; }
+    if (!file) { downloadInstead(b, "This browser can't send files to other apps."); return; }
+    if (file.size > 45e6) { downloadInstead(b, 'The backup is too big for the share menu.'); return; }
     try {
       await navigator.share({ files: [file] });
       backedUp();
-      notesMsg(`Sent ${b.summary}. In ${label}, pick (or make) a HomeOwners folder if it asks where to save.`);
+      notesMsg(`Shared ${b.summary} as ${file.name}.`);
     } catch (e) {
-      if (e.name === 'AbortError') { notesMsg('Backup not sent. Nothing was changed.'); return; }
-      // the very first build can outlast the tap; it's ready now, so the next tap opens the menu instantly
-      if (e.name === 'NotAllowedError' && !instant) { notesMsg(`Your backup is ready. Tap "${label}" once more to send it.`); return; }
-      downloadInstead(svc, b, `Android didn't open the share menu (${e.name}${e.message ? ': ' + e.message : ''}).`);
+      if (e.name === 'AbortError') { notesMsg('Backup not shared. Nothing was changed.'); return; }
+      if (e.name === 'NotAllowedError' && !instant) { notesMsg('Your backup is ready. Tap "Share backup" once more.'); return; }
+      downloadInstead(b, `Android didn't open the share menu (${e.name}${e.message ? ': ' + e.message : ''}).`);
     }
     return;
   }
-  // computer: straight into <drive folder>\HomeOwners
-  if (window.showDirectoryPicker) {
+  if (window.showSaveFilePicker) {
+    let handle;
     try {
-      const dir = await driveFolder(svc, true);
-      notesMsg('Preparing backup…');
-      const b = await buildBackup();
-      if (!b) { notesMsg(NOTHING_YET); return; }
-      const home = await homeFolderIn(dir);
-      const fh = await home.getFileHandle(b.name, { create: true });
-      const w = await fh.createWritable(); await w.write(b.json); await w.close();
-      backedUp();
-      notesMsg(`Backed up ${b.summary} to ${dir.name === FOLDER ? '' : dir.name + '\\'}${FOLDER}\\${b.name}. ${label} will sync it to the cloud.`);
-    } catch (e) {
-      if (e.name === 'AbortError') notesMsg('Backup cancelled. Nothing was changed.');
-      else notesMsg(`${label} backup didn't finish: ${e.message}`, true);
-    }
+      handle = await showSaveFilePicker({ id: 'homeowners-backup', startIn: 'documents', suggestedName: backupName(),
+                                          types: [{ description: 'HomeOwners notes backup', accept: { 'application/json': ['.json'] } }] });
+    } catch (e) { if (e.name !== 'AbortError') notesMsg('Could not open the Save dialog: ' + e.message, true); return; }
+    notesMsg('Preparing backup…');
+    const b = await buildBackup();
+    if (!b) { notesMsg(NOTHING_YET); return; }
+    try { const w = await handle.createWritable(); await w.write(b.json); await w.close(); }
+    catch (e) { notesMsg('Could not save the backup: ' + e.message, true); return; }
+    backedUp();
+    notesMsg(`Saved ${b.summary} as ${handle.name}. If you saved it in your OneDrive or Google Drive folder, it syncs to the cloud. The Save dialog will open in the same folder next time.`);
     return;
   }
-  // anything else: Downloads
   const b = await buildBackup();
   if (!b) { notesMsg(NOTHING_YET); return; }
   saveFile(b.name, b.json, 'application/json'); backedUp();
-  notesMsg(`Saved ${b.summary} to Downloads as ${b.name}. Move it into ${FOLDER_HINT[svc]} to keep it in ${label}.`);
+  notesMsg(`Saved ${b.summary} to your Downloads as ${b.name}.`);
 }
-
-async function cloudRestore(svc) {
-  const label = CLOUD_LABEL[svc];
-  if (cloudConfigured(svc)) {
-    const tokenP = tokenFor(svc);
-    notesMsg(`Signing in to ${label}…`);
-    try {
-      const token = await tokenP;
-      notesMsg(`Looking for your latest backup in ${label} › ${FOLDER}…`);
-      const latest = await (svc === 'google' ? googleLatest : oneDriveLatest)(token);
-      if (!latest) { notesMsg(`There are no backups in ${label} › ${FOLDER} yet.`); return; }
-      await restoreBackupText(latest.text, `${label} › ${latest.name}`);
-    } catch (e) { notesMsg(`${label} restore didn't finish: ${e.message}`, true); }
-    return;
-  }
-  // computer with a remembered folder: newest backup in <folder>\HomeOwners
-  if (!isPhone() && window.showDirectoryPicker) {
-    try {
-      const dir = await driveFolder(svc, true);
-      const home = await homeFolderIn(dir);
-      let newest = null;
-      for await (const h of home.values()) {
-        if (h.kind !== 'file' || !/^homeowners-notes/.test(h.name)) continue;
-        const f = await h.getFile();
-        if (!newest || f.lastModified > newest.lastModified) newest = f;
-      }
-      if (!newest) { notesMsg(`There are no backups in ${label}'s ${FOLDER} folder yet.`); return; }
-      await restoreBackupText(await newest.text(), `${label} › ${FOLDER} › ${newest.name}`);
-    } catch (e) {
-      if (e.name === 'AbortError') notesMsg('Restore cancelled. Nothing was changed.');
-      else notesMsg(`${label} restore didn't finish: ${e.message}`, true);
-    }
-    return;
-  }
-  // phone: the file picker, where Drive and OneDrive are listed
-  toast(svc === 'google'
-    ? 'Pick your backup from Google Drive: tap ☰ (top left) › Drive › HomeOwners, then the newest homeowners-notes file.'
-    : 'Pick your backup from OneDrive: tap ☰ (top left) › OneDrive › HomeOwners, then the newest homeowners-notes file.');
-  $('#restoreFile').click();
-}
-$('#gBackup').addEventListener('click', () => cloudBackup('google'));
-$('#mBackup').addEventListener('click', () => cloudBackup('microsoft'));
-$('#gRestore').addEventListener('click', () => cloudRestore('google'));
-$('#mRestore').addEventListener('click', () => cloudRestore('microsoft'));
-$('#changeFolders').addEventListener('click', async () => {
-  await setSetting('folder-google', null); await setSetting('folder-microsoft', null);
-  notesMsg('Folder choices cleared. The next Google Drive or OneDrive backup will ask you to choose the folder again.');
-});
-if (isPhone() || !window.showDirectoryPicker) $('#changeFoldersWrap').hidden = true;
+$('#shareBackup').addEventListener('click', shareBackup);
+$('#backupHint').textContent = isPhone()
+  ? 'Share backup opens your phone\'s share menu, so you can save it to Google Drive, OneDrive, email or any other app. Restore backup lets you pick the file from any of them.'
+  : 'Share backup opens a Save dialog. Pick any folder, such as your OneDrive or Google Drive folder; it opens there again next time. Restore backup lets you pick the file.';
 loadGoogle()?.catch(() => {});
 
 // ---------- mobile drawer / list sheet

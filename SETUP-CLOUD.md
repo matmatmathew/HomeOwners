@@ -2,14 +2,12 @@
 
 ## How it works now (no setup)
 
-The **Back up to / Restore from Google Drive / OneDrive** buttons (Filters › My notes) use what's
-already on the device, where you're signed in:
+**Filters › My notes › Share backup / Restore backup**
 
-- **Phone:** Back up opens the share menu with the backup attached; tap Drive or OneDrive and pick the
-  HomeOwners folder. Restore opens the file picker; open ☰ › Drive (or OneDrive) › HomeOwners.
-- **PC (Chrome or Edge):** the first backup to each service asks you to choose that service's folder
-  (Google Drive for desktop "My Drive", usually G:, or your OneDrive folder). After that, backups go straight
-  into `<folder>\HomeOwners\` and Restore loads the newest one from there. "Change PC folders" forgets the choice.
+- **Phone:** Share backup opens the normal share menu; pick Google Drive, OneDrive, Gmail or any app.
+  Restore backup opens the file picker; pick the file from Drive, OneDrive, Downloads or anywhere.
+- **PC (Chrome or Edge):** Share backup opens a Save dialog; pick any folder (e.g. your OneDrive or
+  Google Drive folder). It opens in the same folder next time.
 
 Backups are named `homeowners-notes-<date>-<time>.json` (Android shares them as `.backup.txt`; both restore).
 
