@@ -8,6 +8,8 @@ Easiest: download SeminoleCounty.zip, then double-click update-data.bat.
     python update_data.py --yes               # don't ask before publishing
     python update_data.py --year 2027         # override the tax-roll year shown on the site
     python update_data.py --force             # publish even if the safety check fails
+    python update_data.py --download          # download the newest zip from the county first
+    python update_data.py --download --skip-if-current --yes   # what the GitHub "Update data" job runs
 
 Steps: check the zip -> unzip to SeminoleCounty.new -> build homeowners.db.new -> safety check
 -> rebuild docs/data -> swap in the new folder and database -> commit and push docs/data.
@@ -22,6 +24,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+import urllib.request
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -30,6 +33,8 @@ NEW_DIR = DATA_DIR + ".new"
 DB = os.path.join(HERE, "homeowners.db")
 NEW_DB = DB + ".new"
 HOMES_JSON = os.path.join(HERE, "docs", "data", "homes.json")
+COUNTY_URL = "https://files.scpafl.org/data/cama/SeminoleCounty.zip"
+DOWNLOAD = os.path.join(HERE, "SeminoleCounty-download.zip")   # *.zip is in .gitignore
 NEEDED = ["Parcels.csv", "AllSales.csv"]       # the only files the build reads
 MIN_HOMES = 50_000                              # sanity floor (about 107,000 in 2026)
 MAX_DROP = 0.10                                 # stop if homes fall more than 10% from the last build
@@ -39,11 +44,52 @@ def say(msg=""):
     print(msg, flush=True)
 
 
+def summary(msg):
+    """Add a line to the GitHub Actions run summary (no-op when run on a PC)."""
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if path:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+
+
 def stop(msg):
     say()
     say("STOPPED: " + msg)
     say("Nothing on the website was changed.")
+    summary("**Stopped:** " + msg.replace("\n", " ") + "\n\nNothing on the website was changed.")
     sys.exit(1)
+
+
+def download(url):
+    """Download the county zip to DOWNLOAD, retrying a few times. Returns the path."""
+    part = DOWNLOAD + ".part"
+    for attempt in range(1, 4):
+        try:
+            say(f"  downloading {url} (attempt {attempt})")
+            req = urllib.request.Request(url, headers={"User-Agent": "HomeOwners-data-update"})
+            with urllib.request.urlopen(req, timeout=120) as r, open(part, "wb") as f:
+                total = int(r.headers.get("Content-Length") or 0)
+                got, last = 0, 0
+                while True:
+                    chunk = r.read(1 << 20)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    got += len(chunk)
+                    if got - last >= 10 << 20:
+                        last = got
+                        say(f"    {got / 1e6:,.0f} MB" + (f" of {total / 1e6:,.0f} MB" if total else ""))
+            if total and got != total:
+                raise OSError(f"got {got:,} of {total:,} bytes")
+            if got < 10 << 20:
+                raise OSError(f"only {got:,} bytes; that's too small to be the county download")
+            os.replace(part, DOWNLOAD)
+            say(f"  downloaded {got / 1e6:,.0f} MB")
+            return DOWNLOAD
+        except OSError as e:
+            say(f"  download failed: {e}")
+            time.sleep(15 * attempt)
+    stop(f"Could not download {url}. The county site may be down; try again later.")
 
 
 def find_zip(arg):
@@ -120,13 +166,26 @@ def main():
     ap.add_argument("--yes", action="store_true")
     ap.add_argument("--no-publish", action="store_true")
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--download", nargs="?", const=COUNTY_URL, metavar="URL",
+                    help="download the zip from the county (or URL) instead of looking for one")
+    ap.add_argument("--skip-if-current", action="store_true",
+                    help="stop without changes if the website already has this export date")
     a = ap.parse_args()
     t0 = time.time()
 
-    path = find_zip(a.zip)
+    path = download(a.download) if a.download else find_zip(a.zip)
     say(f"1/5  Checking and unzipping {path}")
     as_of = unzip(path)
     say(f"     County export date: {as_of}")
+    if path == DOWNLOAD:
+        os.remove(DOWNLOAD)     # unzipped already; don't leave a stale copy for find_zip() to pick up later
+    if a.skip_if_current:
+        old, _ = previous_build()
+        if old and old.get("dataAsOf") == as_of:
+            shutil.rmtree(NEW_DIR, ignore_errors=True)
+            say(f"\nThe website already has the county export of {as_of}. Nothing to do.")
+            summary(f"The website already has the county export of **{as_of}**. Nothing to do.")
+            return
 
     say("2/5  Building the database (about a minute)")
     if os.path.exists(NEW_DB):
@@ -173,6 +232,8 @@ def main():
     changed = sum(1 for p, o in new_owner.items() if p in old_owner and old_owner[p] != o)
     if old:
         say(f"     Changes since the last build: {added:,} homes added, {gone:,} removed, {changed:,} with a new owner name")
+    summary(f"County export **{as_of}**: {homes:,} owner-occupied homes, {sales:,} sales records."
+            + (f" Since the last build: {added:,} added, {gone:,} removed, {changed:,} new owner names." if old else ""))
 
     if a.no_publish:
         say(f"\nDone in {time.time() - t0:.0f}s. Not published (--no-publish).")
@@ -181,6 +242,7 @@ def main():
     git("add", "-A", "docs/data")
     if git("diff", "--cached", "--quiet", check=False).returncode == 0:
         say("     The website already has exactly this data. Nothing to publish.")
+        summary("The website already has exactly this data. Nothing published.")
         return
     if not a.yes:
         ans = input("     Publish this data to the website now? [Y/n] ").strip().lower()
@@ -194,6 +256,7 @@ def main():
     except RuntimeError as e:
         say(f"\nPublishing failed: {e}. The data is committed locally; run 'git push' in this folder to retry.")
         sys.exit(1)
+    summary("Published. The website and the Android app show the new data in a minute or two.")
     say(f"\nDone in {time.time() - t0:.0f}s. The website and the Android app show the new data in a minute or two.")
 
 

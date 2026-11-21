@@ -1,0 +1,49 @@
+# Downloads the newest Seminole County Property Appraiser export, rebuilds docs/data and publishes it.
+# Runs every Monday, and whenever the "Update county data" button in the app (or "Run workflow" on GitHub) starts it.
+name: Update data
+
+on:
+  schedule:
+    - cron: "17 10 * * 1"     # Mondays 10:17 UTC (5:17 or 6:17 AM Eastern)
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Tax-roll year to show (leave empty to use the year of the county's export date)"
+        required: false
+        default: ""
+      force:
+        description: "Publish even if the safety check fails"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write              # commit and push docs/data
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download, build, check and publish
+        env:
+          YEAR: ${{ inputs.year }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          git config user.name "HomeOwners data update"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          args="--download --skip-if-current --yes"
+          if [ -n "$YEAR" ]; then args="$args --year $YEAR"; fi
+          if [ "$FORCE" = "true" ]; then args="$args --force"; fi
+          python update_data.py $args

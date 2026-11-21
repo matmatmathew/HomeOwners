@@ -30,9 +30,19 @@ It works on PC and phone, with live location, and comes as an Android app.
 
 The Property Appraiser publishes a new download every day:
 **Current Year Seminole County Parcel Data**, https://files.scpafl.org/data/cama/SeminoleCounty.zip (about 96 MB).
-Updating every week or month is plenty.
+
+**Automatic (normal):** the GitHub Actions workflow `.github/workflows/update-data.yml` runs every Monday. It downloads
+the zip, runs `update_data.py --download --skip-if-current --yes`, and publishes. No PC needed.
+
+**From the app:** Filters › **County data** › **Update county data now** starts the same workflow and shows its
+progress. It needs a one-time token on each device (see [Updating from the app](#updating-from-the-app)).
+
+**From GitHub:** Actions › **Update data** › **Run workflow**. The form also has **year** and **force** options.
+
+**From this PC (still works):**
 
 1. Download `SeminoleCounty.zip`. Leave it in **Downloads**, or put it in this project folder.
+   Or skip the download: `python update_data.py --download`.
 2. Double-click **`update-data.bat`**. You can also drag a zip onto it.
 3. Read the summary. Answer **Y** to publish.
 
@@ -49,7 +59,10 @@ What `update_data.py` does:
 | 4. Rebuild site data | Swaps in the new folder and database, then runs `build_site.py` to rewrite `docs/data/`. Prints how many homes were added, removed, or changed owner. |
 | 5. Publish | Asks first, then commits `docs/data` ("Update data: county export of …") and pushes. Skipped if the data is identical. |
 
-Options: `python update_data.py [zip] [--no-publish] [--yes] [--year 2027] [--force]`
+Options: `python update_data.py [zip] [--download [URL]] [--skip-if-current] [--no-publish] [--yes] [--year 2027] [--force]`
+
+- `--download` fetches the zip from the county (or URL) instead of looking for one, and deletes it after unzipping.
+- `--skip-if-current` stops without changes when the website already has that export date.
 
 - `--no-publish` builds and checks, but doesn't commit or push. Preview it with [Preview locally](#preview-locally).
 - `--yes` publishes without asking.
@@ -57,7 +70,24 @@ Options: `python update_data.py [zip] [--no-publish] [--yes] [--year 2027] [--fo
   If the county keeps publishing the previous year's roll into January, run with `--year` (for example `--year 2026`).
 - `--force` publishes even when the safety check fails, for example after a real, large change in the county data.
 
-Each update adds about 6 MB to the repository history. Monthly updates are fine for years. Daily updates would bloat it.
+Each update adds about 6 MB to the repository history. Weekly updates add about 300 MB a year, which is fine for
+several years. Don't schedule daily updates. If the repository ever gets too big, switch the schedule to monthly
+(`cron` in the workflow).
+
+### Updating from the app
+
+The button calls the GitHub API from the browser, so each device needs a **fine-grained personal access token**:
+GitHub › Settings › Developer settings › Fine-grained tokens › **Generate new token**. Set Repository access to
+**Only select repositories › HomeOwners** and Permissions › Repository › **Actions: Read and write**, nothing else.
+That token can start, follow or cancel workflow runs on this repository, and nothing more: it can't change code or data.
+
+- Stored in localStorage `homeowners.githubToken` on that device only. It's never in the repository, never in backups.
+- The app starts the run (`workflow_dispatch` on `main`), follows it, then watches for the `pages-build-deployment`
+  run its push triggers. No Pages run means there was no new data.
+- When the token expires, the box says so. Make a new one and tap **Token**.
+- `homes.json` is fetched with `cache: 'no-cache'`, so a reload after an update gets the new file right away.
+
+If the county site blocks or is down, the run fails with "Could not download" and nothing changes. Try again later.
 
 **Your notes survive updates.** Notes, photos, voice notes and contacts are stored on each device, keyed by
 parcel number, and parcel numbers don't change. A home that loses its homestead exemption leaves the map, but its notes
@@ -101,6 +131,7 @@ SeminoleCounty.zip ──update_data.py──► SeminoleCounty\*.csv ──buil
 
 | Path | What it is | In Git? |
 |---|---|---|
+| `.github/workflows/update-data.yml` | Weekly and on-demand data update (GitHub Actions). | yes |
 | `update-data.bat` | Double-click to load a new county download. | yes |
 | `update_data.py` | The update steps above. | yes |
 | `build_db.py` | County CSVs → `homeowners.db`. | yes |
@@ -197,6 +228,7 @@ Map tiles come from **OpenStreetMap**.
 | Location | `onLocateTap()`, `onFix()`, `startCompass()`, `keepAwake()` | `watchPosition`. The heading uses the compass when available, otherwise the GPS heading. Keeps the screen on with Wake Lock, or the app's `keepAwake`. |
 | Filters and list | `currentFilter()`, `matches()`, `search()`, `renderTable()` | Filtering is debounced 300 ms. The table shows the top rows of the sorted results. |
 | Export | `saveFile()` | CSV of the current results. |
+| Data update | `ubStart()`, `ubFollow()`, `gh()` | **County data** box: starts and follows the GitHub Actions update. Token in localStorage `homeowners.githubToken`. |
 | Backups | `buildBackup()`, `restoreBackupText()` | See [Notes storage and backups](#notes-storage-and-backups). |
 | Cloud (unused) | `CLOUD_BUILT_IN` | Direct Google Drive/OneDrive code. No button uses it. See [SETUP-CLOUD.md](SETUP-CLOUD.md). |
 | Startup | the final `(async () => …)()` | Loads `homes.json`, fills the filters, shows "data as of", restores the session, and hooks up shared text in the app. |
@@ -290,7 +322,8 @@ Then commit and push `docs/app/HomeOwners.apk`. Users install the new APK over t
 
 ## Publishing and Git
 
-- GitHub Pages publishes `docs/` from `main` about a minute after each push.
+- GitHub Pages publishes `docs/` from `main` about a minute after each push. **Settings › Pages must be
+  "Deploy from a branch", `main`, `/docs`.** If it's set to `/ (root)`, the site and the app show this README instead of the map.
 - Push as **matmatmathew**. This PC's credential manager defaults to a different GitHub account, so the remote URL
   includes the user name (`https://matmatmathew@github.com/matmatmathew/HomeOwners.git`). Keep it that way.
 - Edit `docs/index.html`, preview locally, then commit and push. Changes reach the website and the app.
@@ -306,6 +339,8 @@ Then commit and push `docs/app/HomeOwners.apk`. Users install the new APK over t
 | `update-data.bat`: "Publishing failed" | The data is committed locally. Fix the sign-in (see above) and run `git push`. |
 | `python` not found | Install Python 3 from python.org. No extra packages are needed. |
 | The site shows old data after an update | Wait 2 minutes, then reload. On a phone, close and reopen the app or tab. |
+| The site or app shows a text page about HomeOwners instead of the map | Settings › Pages is publishing the wrong folder. Set it to `main` and `/docs`. |
+| "The update stopped" in the app | Tap **Details** for the log. Usually the county site was down (try later) or the safety check failed (check the data, then Actions › Update data › Run workflow with **force**). |
 | The site says "Could not load the home data" | Check the internet connection. The 17 MB file needs to download once per visit. |
 | Notes disappeared | They're per device and per browser, and the app is separate from Chrome. Restore the latest backup. |
 | Share backup says "Permission denied" (phone) | Fixed by sharing as `.txt`. If it returns, use **Download a copy**. |

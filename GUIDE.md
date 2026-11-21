@@ -119,8 +119,17 @@ It needs an internet connection to open.
 
 ## The data
 
-The homes come from the **Seminole County Property Appraiser's** public parcel download. It is refreshed when
-the site owner loads a new download (see `README.md`). The line under the title shows the date of that download.
+The homes come from the **Seminole County Property Appraiser's** public parcel download. It is refreshed
+automatically every Monday. The line under the title shows the date of that download.
+
+**Update it yourself:** in Filters, scroll down to **County data** and tap **Update county data now**. GitHub
+downloads the county's newest file, checks it and publishes it, which takes about 5 minutes. The box shows the
+progress; when it says the new data is live, tap **Reload with new data**. If the site already has the newest
+data, it says so and nothing changes.
+
+The first time, tap **Set up** and paste a GitHub token (the box lists the steps). It's saved on that device
+only, and it can do nothing except run this update. Each phone or browser needs its own setup. To use a new
+token, tap **Token**; **Remove token from this device** forgets it.
 
 When the data is updated, your notes stay attached to their homes, because they're tied to the parcel number. A
 home that loses its homestead exemption (sold to an investor, for example) disappears from the map, but its notes

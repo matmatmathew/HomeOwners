@@ -262,6 +262,18 @@
     .locate-btn { width: 44px; height: 44px; }
     .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 40px; }
   }
+  /* county data update (GitHub Actions) */
+  .update-box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 10px 0 4px; display: grid; gap: 8px; background: var(--bg); }
+  .update-box .ub-head { display: flex; align-items: center; gap: 8px; }
+  .update-box h2 { font-size: 13.5px; margin: 0; flex: 1; }
+  .update-box .ub-msg { font-size: 12.5px; color: var(--muted); }
+  .update-box .ub-msg.err { color: #b42318; }
+  .update-box .ub-msg.ok { color: var(--home); font-weight: 600; }
+  .update-box .ub-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .update-box ol { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--muted); }
+  .update-box input[type=password] { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); font: inherit; }
+  .update-box a { color: var(--accent); }
+  @media (prefers-color-scheme: dark) { .update-box .ub-msg.err { color: #ff8a80; } }
   @media (prefers-reduced-motion: reduce) { aside, #results { transition: none; } }
 </style>
 </head>
@@ -337,6 +349,30 @@
   <div class="row"><input type="checkbox" id="inview"><label for="inview">Only what's visible on the map</label></div>
 
   <p class="about" style="margin-top:14px">Source: Seminole County Property Appraiser, <span id="year">2026</span> tax roll. <span id="asOf"></span> Sales history includes non-market transfers.</p>
+
+  <section class="update-box" aria-labelledby="updateTitle">
+    <div class="ub-head"><h2 id="updateTitle">County data</h2><button type="button" id="ubTokenLink" class="linkish">Set up</button></div>
+    <div class="ub-msg" id="ubMsg" role="status">Updates every Monday automatically.</div>
+    <div class="ub-btns">
+      <button type="button" id="ubStart" class="primary">Update county data now</button>
+      <button type="button" id="ubReload" hidden>Reload with new data</button>
+      <a id="ubLog" href="#" target="_blank" rel="noopener" hidden>Details</a>
+    </div>
+    <div id="ubSetup" hidden>
+      <ol>
+        <li>On GitHub, signed in as matmatmathew, open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">New fine-grained token</a>.</li>
+        <li>Repository access: <b>Only select repositories</b> &rarr; <b>HomeOwners</b>.</li>
+        <li>Permissions &rarr; Repository &rarr; <b>Actions: Read and write</b>. Nothing else.</li>
+        <li>Generate, copy the token and paste it here.</li>
+      </ol>
+      <input type="password" id="ubToken" placeholder="github_pat_..." autocomplete="off" spellcheck="false" aria-label="GitHub token" style="margin-top:8px">
+      <div class="ub-btns" style="margin-top:8px">
+        <button type="button" id="ubSave" class="primary">Save</button>
+        <button type="button" id="ubCancel">Cancel</button>
+        <button type="button" id="ubForget" class="linkish" hidden>Remove token from this device</button>
+      </div>
+    </div>
+  </section>
 
   <div class="buttons">
     <button class="primary mobile-only" id="showResults">Show results</button>
@@ -1793,9 +1829,149 @@ function checkList(el, items) {
 }
 function countBy(col) { const c = new Map(); for (const r of rows) c.set(r[col], (c.get(r[col]) || 0) + 1); return [...c].sort((a, b) => b[1] - a[1]); }
 
+// ---------- county data update: starts the "Update data" GitHub Actions job and follows it.
+// Needs a fine-grained GitHub token (Actions: read and write, this repo only), kept on this device only.
+const GH_API = 'https://api.github.com/repos/matmatmathew/HomeOwners';
+const GH_WF = 'update-data.yml';
+const GH_TOKEN_KEY = 'homeowners.githubToken';
+const ghToken = () => stamp.get(GH_TOKEN_KEY);
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+let ubBusy = false;
+
+async function gh(path, opts = {}) {
+  const r = await fetch(GH_API + path, { ...opts, cache: 'no-store', headers: {
+    Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28',
+    Authorization: 'Bearer ' + ghToken(), ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
+  if (r.status === 401) throw new Error('GitHub did not accept the token (it may have expired). Tap Token to enter a new one.');
+  if (r.status === 403 || r.status === 404) throw new Error('The token can\'t run updates. It needs Actions: Read and write on HomeOwners. Tap Token to fix it.');
+  if (!r.ok) throw new Error(`GitHub answered ${r.status}. Try again in a minute.`);
+  return r.status === 204 ? null : r.json();
+}
+function ubSay(text, kind) {
+  const m = $('#ubMsg'); m.textContent = text;
+  m.classList.toggle('err', kind === 'err'); m.classList.toggle('ok', kind === 'ok');
+}
+function ubLog(url) { const a = $('#ubLog'); a.hidden = !url; if (url) a.href = url; }
+const mins = ms => { const m = Math.round(ms / 60000); return m < 1 ? 'under a minute' : m === 1 ? '1 minute' : m + ' minutes'; };
+const shortDate = iso => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+
+function ubRender() {
+  const has = !!ghToken();
+  $('#ubTokenLink').textContent = has ? 'Token' : 'Set up';
+  $('#ubForget').hidden = !has;
+  $('#ubStart').disabled = ubBusy;
+}
+function ubShowSetup(show) {
+  $('#ubSetup').hidden = !show;
+  if (show) { $('#ubToken').value = ''; $('#ubToken').focus(); }
+}
+
+// Follow a run to the end. If it published, GitHub Pages then rebuilds the site: follow that too.
+async function ubFollow(run) {
+  ubBusy = true; ubRender(); ubLog(run.html_url);
+  try {
+    while (run.status !== 'completed') {
+      const since = Date.now() - new Date(run.run_started_at || run.created_at);
+      ubSay(run.status === 'in_progress'
+        ? `Downloading and rebuilding the county data... (${mins(since)} so far; usually 3 to 6 minutes)`
+        : 'Waiting for GitHub to start the update...');
+      await sleep(10000);
+      run = await gh(`/actions/runs/${run.id}`);
+    }
+    if (run.conclusion !== 'success') {
+      ubSay(run.conclusion === 'cancelled' ? 'The update was cancelled.'
+        : 'The update stopped without changing the website. Tap Details to see why (usually the county site was down, or the new data failed the safety check).', 'err');
+      return;
+    }
+    ubSay('Update finished. Checking whether there was new data...');
+    let pages = null;
+    for (let i = 0; i < 10 && !pages; i++) {
+      const list = await gh(`/actions/runs?per_page=10&created=${encodeURIComponent('>=' + run.created_at)}`);
+      pages = (list.workflow_runs || []).find(w => w.name === 'pages-build-deployment');
+      if (!pages) await sleep(6000);
+    }
+    if (!pages) { ubSay('The website already has the newest county data. Nothing to change.', 'ok'); return; }
+    ubLog(pages.html_url);
+    while (pages.status !== 'completed') {
+      ubSay('New data published. The website is updating (about a minute)...');
+      await sleep(8000);
+      pages = await gh(`/actions/runs/${pages.id}`);
+    }
+    if (pages.conclusion === 'success') {
+      ubLog(null);
+      ubSay('New county data is live.', 'ok');
+      $('#ubReload').hidden = false;
+      toast('New county data is live. Tap "Reload with new data".');
+    } else {
+      ubSay('The data was published, but the website build failed. Tap Details.', 'err');
+    }
+  } catch (e) { ubSay(e.message, 'err'); }
+  finally { ubBusy = false; ubRender(); }
+}
+
+async function ubStart() {
+  if (!ghToken()) { ubShowSetup(true); ubSay('Set up a GitHub token once, then you can update from here.'); return; }
+  if (ubBusy) return;
+  $('#ubReload').hidden = true; ubLog(null);
+  ubBusy = true; ubRender();
+  try {
+    const since = new Date(Date.now() - 60000);
+    await gh(`/actions/workflows/${GH_WF}/dispatches`, { method: 'POST', body: JSON.stringify({ ref: 'main' }) });
+    ubSay('Update started. Waiting for GitHub...');
+    let run = null;
+    for (let i = 0; i < 15 && !run; i++) {
+      await sleep(4000);
+      const list = await gh(`/actions/workflows/${GH_WF}/runs?event=workflow_dispatch&per_page=5`);
+      run = (list.workflow_runs || []).find(w => new Date(w.created_at) >= since);
+    }
+    ubBusy = false;
+    if (!run) { ubSay('The update was started, but GitHub hasn\'t listed it yet. Reopen the app in a few minutes to see how it went.'); ubRender(); return; }
+    ubFollow(run);
+  } catch (e) { ubBusy = false; ubRender(); ubSay(e.message, 'err'); }
+}
+
+// On load: show the last update, and keep following it if one is still running.
+async function ubInit() {
+  ubRender();
+  if (!ghToken()) return;
+  try {
+    const list = await gh(`/actions/workflows/${GH_WF}/runs?per_page=1`);
+    const run = list.workflow_runs?.[0];
+    if (!run) return;
+    if (run.status !== 'completed') { ubFollow(run); return; }
+    const ok = run.conclusion === 'success';
+    ubSay(`Last ${run.event === 'schedule' ? 'automatic' : 'manual'} update: ${shortDate(run.created_at)}, ${ok ? 'finished' : 'did not finish'}. Updates every Monday automatically.`, ok ? '' : 'err');
+    if (!ok) ubLog(run.html_url);
+  } catch (e) { ubSay(e.message, 'err'); }
+}
+
+$('#ubStart').addEventListener('click', ubStart);
+$('#ubTokenLink').addEventListener('click', () => ubShowSetup($('#ubSetup').hidden));
+$('#ubCancel').addEventListener('click', () => ubShowSetup(false));
+$('#ubReload').addEventListener('click', () => location.reload());
+$('#ubForget').addEventListener('click', () => {
+  try { localStorage.removeItem(GH_TOKEN_KEY); } catch (e) {}
+  ubShowSetup(false); ubRender(); ubLog(null); ubSay('Token removed from this device.');
+});
+$('#ubSave').addEventListener('click', async () => {
+  const v = $('#ubToken').value.trim();
+  if (!v) { ubSay('Paste the token first.', 'err'); return; }
+  const before = ghToken();
+  stamp.set(GH_TOKEN_KEY, v);
+  if (ghToken() !== v) { ubSay('This browser is not letting the site save the token (private browsing or storage turned off).', 'err'); return; }
+  try {
+    await gh(`/actions/workflows/${GH_WF}`);
+    ubShowSetup(false); ubRender(); ubSay('Token saved on this device. You can update the county data now.', 'ok');
+  } catch (e) {
+    if (before) stamp.set(GH_TOKEN_KEY, before); else { try { localStorage.removeItem(GH_TOKEN_KEY); } catch (_) {} }
+    ubRender(); ubSay(e.message, 'err');
+  }
+});
+ubInit();
+
 (async () => {
   try {
-    D = await (await fetch('data/homes.json')).json();
+    D = await (await fetch('data/homes.json', { cache: 'no-cache' })).json();
   } catch (e) {
     $('#loading').textContent = 'Could not load the home data. Check your connection and reload the page.';
     return;
